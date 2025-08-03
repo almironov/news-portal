@@ -152,3 +152,195 @@ The initial migration (`V1__create_tables.sql`) creates the following tables:
 - `comments`: Stores comments on news articles
 
 To add new migrations, create SQL files with the naming convention `V{number}__{description}.sql`.
+
+## API Architecture
+
+### Package Structure
+
+The application follows a layered architecture with clear separation of concerns:
+
+- `com.dev.news.newsportal.dto` - Data Transfer Objects
+  - `request` - Request DTOs for incoming data
+  - `response` - Response DTOs for outgoing data
+- `com.dev.news.newsportal.entity` - JPA entities
+- `com.dev.news.newsportal.mapper` - MapStruct mappers for entity-DTO conversion
+- `com.dev.news.newsportal.repository` - Spring Data JPA repositories
+- `com.dev.news.newsportal.service` - Service interfaces and implementations
+- `com.dev.news.newsportal.controller` - REST controllers
+- `com.dev.news.newsportal.exception` - Custom exceptions and exception handling
+- `com.dev.news.newsportal.config` - Configuration classes
+
+### DTO Implementation
+
+The application uses Data Transfer Objects (DTOs) to separate the web layer from the persistence layer:
+
+- **Request DTOs**: Used for incoming data validation and transfer
+  - `NewsRequestDto`, `UserRequestDto`, `CommentRequestDto`
+  - Include validation annotations for input validation
+  
+- **Response DTOs**: Used for returning data to clients
+  - `NewsResponseDto`, `UserResponseDto`, `CommentResponseDto`
+  - `NewsListItemDto`, `UserSummaryDto`, `CommentListItemDto`
+  - Tailored to specific use cases to avoid over-fetching
+
+- **MapStruct Mappers**: Automate the conversion between entities and DTOs
+  - `NewsMapper`, `UserMapper`, `CommentMapper`
+  - Handle nested object mappings and custom transformations
+
+Benefits of this approach:
+- Clear separation between API contracts and database schema
+- Improved security by controlling what data is exposed
+- Better performance by fetching only required data
+- Simplified validation with Jakarta Validation annotations
+
+### API Documentation
+
+The API is documented using OpenAPI (Swagger):
+
+- Access the Swagger UI at: `/swagger-ui.html`
+- API specification available at: `/v3/api-docs`
+
+### API Usage Examples
+
+#### News API
+
+**Get all news:**
+```
+GET /api/v1/news
+```
+
+**Get news by ID:**
+```
+GET /api/v1/news/{id}
+```
+
+**Create news:**
+```
+POST /api/v1/news
+Content-Type: application/json
+
+{
+  "title": "Breaking News",
+  "text": "This is a breaking news article",
+  "imageUrl": "https://example.com/image.jpg",
+  "authorId": 1
+}
+```
+
+**Update news:**
+```
+PUT /api/v1/news/{id}
+Content-Type: application/json
+
+{
+  "title": "Updated Breaking News",
+  "text": "This is an updated breaking news article",
+  "imageUrl": "https://example.com/updated-image.jpg",
+  "authorId": 1
+}
+```
+
+**Delete news:**
+```
+DELETE /api/v1/news/{id}
+```
+
+#### User API
+
+**Get all users:**
+```
+GET /api/v1/users
+```
+
+**Get user by ID:**
+```
+GET /api/v1/users/{id}
+```
+
+**Create user:**
+```
+POST /api/v1/users
+Content-Type: application/json
+
+{
+  "nickname": "johndoe",
+  "email": "john.doe@example.com",
+  "role": "ROLE_USER"
+}
+```
+
+**Update user:**
+```
+PUT /api/v1/users/{id}
+Content-Type: application/json
+
+{
+  "nickname": "johndoe_updated",
+  "email": "john.doe.updated@example.com",
+  "role": "ROLE_EDITOR"
+}
+```
+
+**Delete user:**
+```
+DELETE /api/v1/users/{id}
+```
+
+#### Comment API
+
+**Get comments by news ID:**
+```
+GET /api/v1/comments/news/{newsId}
+```
+
+**Create comment:**
+```
+POST /api/v1/comments
+Content-Type: application/json
+
+{
+  "text": "This is a comment",
+  "authorNickname": "johndoe",
+  "newsId": 1,
+  "parentCommentId": null
+}
+```
+
+**Update comment:**
+```
+PUT /api/v1/comments/{id}
+Content-Type: application/json
+
+{
+  "text": "This is an updated comment",
+  "authorNickname": "johndoe",
+  "newsId": 1,
+  "parentCommentId": null
+}
+```
+
+**Delete comment:**
+```
+DELETE /api/v1/comments/{id}
+```
+
+### Error Handling
+
+The API uses standardized error responses:
+
+- **404 Not Found**: When a requested resource doesn't exist
+- **400 Bad Request**: For validation errors
+- **409 Conflict**: When a resource with the same unique identifier already exists
+- **500 Internal Server Error**: For unexpected server errors
+
+Example error response:
+```json
+{
+  "status": 400,
+  "message": "Validation failed",
+  "timestamp": "2025-08-03T17:28:00",
+  "errors": {
+    "title": "Title is required",
+    "authorId": "Author ID is required"
+  }
+}

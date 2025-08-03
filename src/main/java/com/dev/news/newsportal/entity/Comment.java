@@ -48,5 +48,6 @@ public class Comment {
     private Comment parentComment;
 
     @OneToMany(mappedBy = "parentComment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<Comment> replies = new ArrayList<>();
 }

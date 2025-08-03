@@ -31,5 +31,6 @@ public class User {
     private String role;
 
     @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<News> news = new ArrayList<>();
 }
