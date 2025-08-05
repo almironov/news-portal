@@ -14,20 +14,28 @@ servers:
 paths:
   /api/v1/news:
     get:
-      summary: Get all news articles
-      description: Retrieve a list of all news articles
+      summary: Get news articles with pagination
+      description: Retrieve a paginated list of news articles sorted by creation date in descending order
       operationId: getAllNews
       tags:
         - News
+      parameters:
+        - $ref: '#/components/parameters/PageParameter'
+        - $ref: '#/components/parameters/SizeParameter'
+        - $ref: '#/components/parameters/SortParameter'
       responses:
         '200':
-          description: List of news articles retrieved successfully
+          description: Paginated list of news articles retrieved successfully
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/NewsListItem'
+                $ref: '#/components/schemas/PagedNewsListResponse'
+        '400':
+          description: Invalid pagination parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
@@ -270,7 +278,137 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
 components:
+  parameters:
+    PageParameter:
+      name: page
+      in: query
+      required: false
+      description: Page number (0-based)
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        default: 0
+        example: 0
+    
+    SizeParameter:
+      name: size
+      in: query
+      required: false
+      description: Number of items per page
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 100
+        default: 10
+        example: 10
+    
+    SortParameter:
+      name: sort
+      in: query
+      required: false
+      description: Sort criteria in format 'property,direction' (e.g., 'creationDate,desc')
+      schema:
+        type: array
+        items:
+          type: string
+        example: ["creationDate,desc"]
+
   schemas:
+    PagedNewsListResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewsListItem'
+          description: List of news articles for current page
+        pageable:
+          $ref: '#/components/schemas/PageableInfo'
+        totalElements:
+          type: integer
+          format: int64
+          description: Total number of elements
+          example: 150
+        totalPages:
+          type: integer
+          format: int32
+          description: Total number of pages
+          example: 15
+        size:
+          type: integer
+          format: int32
+          description: Size of current page
+          example: 10
+        number:
+          type: integer
+          format: int32
+          description: Current page number (0-based)
+          example: 0
+        numberOfElements:
+          type: integer
+          format: int32
+          description: Number of elements in current page
+          example: 10
+        first:
+          type: boolean
+          description: Whether this is the first page
+          example: true
+        last:
+          type: boolean
+          description: Whether this is the last page
+          example: false
+        empty:
+          type: boolean
+          description: Whether the page is empty
+          example: false
+    
+    PageableInfo:
+      type: object
+      properties:
+        sort:
+          $ref: '#/components/schemas/SortInfo'
+        pageNumber:
+          type: integer
+          format: int32
+          description: Current page number (0-based)
+          example: 0
+        pageSize:
+          type: integer
+          format: int32
+          description: Size of the page
+          example: 10
+        offset:
+          type: integer
+          format: int64
+          description: Offset of the first element
+          example: 0
+        paged:
+          type: boolean
+          description: Whether the request is paged
+          example: true
+        unpaged:
+          type: boolean
+          description: Whether the request is unpaged
+          example: false
+    
+    SortInfo:
+      type: object
+      properties:
+        sorted:
+          type: boolean
+          description: Whether the content is sorted
+          example: true
+        unsorted:
+          type: boolean
+          description: Whether the content is unsorted
+          example: false
+        empty:
+          type: boolean
+          description: Whether the sort is empty
+          example: false
+
     NewsRequest:
       type: object
       required:

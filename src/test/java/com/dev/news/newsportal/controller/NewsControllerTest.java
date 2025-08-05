@@ -1,9 +1,6 @@
 package com.dev.news.newsportal.controller;
 
-import com.dev.news.newsportal.api.model.news.NewsListItem;
-import com.dev.news.newsportal.api.model.news.NewsRequest;
-import com.dev.news.newsportal.api.model.news.NewsResponse;
-import com.dev.news.newsportal.api.model.news.UserSummary;
+import com.dev.news.newsportal.api.model.news.*;
 import com.dev.news.newsportal.exception.ResourceNotFoundException;
 import com.dev.news.newsportal.mapper.api.NewsApiMapper;
 import com.dev.news.newsportal.model.NewsModel;
@@ -14,8 +11,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
@@ -24,22 +25,10 @@ import java.util.List;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(NewsController.class)
 class NewsControllerTest {
@@ -50,10 +39,10 @@ class NewsControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private NewsService newsService;
 
-    @MockBean
+    @MockitoBean
     private NewsApiMapper newsApiMapper;
 
     private NewsRequest newsRequest;
@@ -113,27 +102,43 @@ class NewsControllerTest {
     }
 
     @Test
-    void getAllNews_shouldReturnListOfNewsListItemDto() throws Exception {
+    void getAllNews_withDefaultPagination_shouldReturnPagedResponse() throws Exception {
         // Given
-        List<NewsModel> newsModels = Arrays.asList(newsModel);
-        List<NewsListItem> newsListItems = Arrays.asList(newsListItem);
+        Pageable defaultPageable = PageRequest.of(0, 10);
+        Page<NewsModel> newsPage = new PageImpl<>(Arrays.asList(newsModel), defaultPageable, 1);
+        PagedNewsListResponse pagedResponse = new PagedNewsListResponse()
+                .content(Arrays.asList(newsListItem))
+                .totalElements(1L)
+                .totalPages(1)
+                .size(10)
+                .number(0)
+                .numberOfElements(1)
+                .first(true)
+                .last(true)
+                .empty(false);
         
-        when(newsService.findAll()).thenReturn(newsModels);
-        when(newsApiMapper.toListItemList(newsModels)).thenReturn(newsListItems);
+        when(newsService.findAll(any(Pageable.class))).thenReturn(newsPage);
+        when(newsApiMapper.toPagedResponse(newsPage)).thenReturn(pagedResponse);
 
         // When/Then
         mockMvc.perform(get("/api/v1/news"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].id", is(1)))
-                .andExpect(jsonPath("$[0].title", is("Test News")))
-                .andExpect(jsonPath("$[0].imageUrl", is("https://example.com/image.jpg")))
-                .andExpect(jsonPath("$[0].author.id", is(1)))
-                .andExpect(jsonPath("$[0].author.nickname", is("testuser")))
-                .andExpect(jsonPath("$[0].commentCount", is(0)));
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[0].title", is("Test News")))
+                .andExpect(jsonPath("$.content[0].imageUrl", is("https://example.com/image.jpg")))
+                .andExpect(jsonPath("$.content[0].author.id", is(1)))
+                .andExpect(jsonPath("$.content[0].author.nickname", is("testuser")))
+                .andExpect(jsonPath("$.content[0].commentCount", is(0)))
+                .andExpect(jsonPath("$.totalElements", is(1)))
+                .andExpect(jsonPath("$.totalPages", is(1)))
+                .andExpect(jsonPath("$.size", is(10)))
+                .andExpect(jsonPath("$.number", is(0)))
+                .andExpect(jsonPath("$.first", is(true)))
+                .andExpect(jsonPath("$.last", is(true)));
 
-        verify(newsService).findAll();
-        verify(newsApiMapper).toListItemList(newsModels);
+        verify(newsService).findAll(any(Pageable.class));
+        verify(newsApiMapper).toPagedResponse(newsPage);
     }
 
     @Test
@@ -357,5 +362,125 @@ class NewsControllerTest {
                 .andExpect(jsonPath("$", hasSize(0)));
 
         verify(newsService).findByTitle("NonExistent");
+    }
+
+    @Test
+    void getAllNews_withPaginationParameters_shouldReturnPagedResponse() throws Exception {
+        // Given
+        Pageable pageable = PageRequest.of(0, 5);
+        Page<NewsModel> newsPage = new PageImpl<>(Arrays.asList(newsModel), pageable, 1);
+        PagedNewsListResponse pagedResponse = new PagedNewsListResponse()
+                .content(Arrays.asList(newsListItem))
+                .totalElements(1L)
+                .totalPages(1)
+                .size(5)
+                .number(0)
+                .numberOfElements(1)
+                .first(true)
+                .last(true)
+                .empty(false);
+        
+        when(newsService.findAll(any(Pageable.class))).thenReturn(newsPage);
+        when(newsApiMapper.toPagedResponse(newsPage)).thenReturn(pagedResponse);
+
+        // When/Then
+        mockMvc.perform(get("/api/v1/news")
+                .param("page", "0")
+                .param("size", "5")
+                .param("sort", "creationDate,desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.totalElements", is(1)))
+                .andExpect(jsonPath("$.totalPages", is(1)))
+                .andExpect(jsonPath("$.size", is(5)))
+                .andExpect(jsonPath("$.number", is(0)))
+                .andExpect(jsonPath("$.first", is(true)))
+                .andExpect(jsonPath("$.last", is(true)));
+
+        verify(newsService).findAll(any(Pageable.class));
+        verify(newsApiMapper).toPagedResponse(newsPage);
+    }
+
+    @Test
+    void getAllNews_withInvalidPaginationParameters_shouldReturnBadRequest() throws Exception {
+        // When/Then - Test negative page
+        mockMvc.perform(get("/api/v1/news")
+                .param("page", "-1")
+                .param("size", "10"))
+                .andExpect(status().isBadRequest());
+
+        // When/Then - Test size > 100
+        mockMvc.perform(get("/api/v1/news")
+                .param("page", "0")
+                .param("size", "101"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getAllNews_withEmptyResults_shouldReturnEmptyPagedResponse() throws Exception {
+        // Given
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<NewsModel> emptyPage = new PageImpl<>(Arrays.asList(), pageable, 0);
+        PagedNewsListResponse emptyResponse = new PagedNewsListResponse()
+                .content(Arrays.asList())
+                .totalElements(0L)
+                .totalPages(0)
+                .size(10)
+                .number(0)
+                .numberOfElements(0)
+                .first(true)
+                .last(true)
+                .empty(true);
+        
+        when(newsService.findAll(any(Pageable.class))).thenReturn(emptyPage);
+        when(newsApiMapper.toPagedResponse(emptyPage)).thenReturn(emptyResponse);
+
+        // When/Then
+        mockMvc.perform(get("/api/v1/news"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)))
+                .andExpect(jsonPath("$.totalElements", is(0)))
+                .andExpect(jsonPath("$.totalPages", is(0)))
+                .andExpect(jsonPath("$.empty", is(true)));
+
+        verify(newsService).findAll(any(Pageable.class));
+        verify(newsApiMapper).toPagedResponse(emptyPage);
+    }
+
+    @Test
+    void getAllNews_withPageBeyondAvailableData_shouldReturnEmptyPagedResponse() throws Exception {
+        // Given
+        Pageable pageable = PageRequest.of(10, 10); // Page 10 when there's only 1 total element
+        Page<NewsModel> emptyPage = new PageImpl<>(Arrays.asList(), pageable, 1);
+        PagedNewsListResponse emptyResponse = new PagedNewsListResponse()
+                .content(Arrays.asList())
+                .totalElements(1L)
+                .totalPages(1)
+                .size(10)
+                .number(10)
+                .numberOfElements(0)
+                .first(false)
+                .last(true)
+                .empty(true);
+        
+        when(newsService.findAll(any(Pageable.class))).thenReturn(emptyPage);
+        when(newsApiMapper.toPagedResponse(emptyPage)).thenReturn(emptyResponse);
+
+        // When/Then
+        mockMvc.perform(get("/api/v1/news")
+                .param("page", "10")
+                .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)))
+                .andExpect(jsonPath("$.totalElements", is(1)))
+                .andExpect(jsonPath("$.totalPages", is(1)))
+                .andExpect(jsonPath("$.number", is(10)))
+                .andExpect(jsonPath("$.first", is(false)))
+                .andExpect(jsonPath("$.last", is(true)))
+                .andExpect(jsonPath("$.empty", is(true)));
+
+        verify(newsService).findAll(any(Pageable.class));
+        verify(newsApiMapper).toPagedResponse(emptyPage);
     }
 }

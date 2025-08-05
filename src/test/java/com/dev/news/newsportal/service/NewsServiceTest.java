@@ -19,8 +19,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -390,5 +397,85 @@ class NewsServiceTest {
 
         verify(newsRepository).findByTitleContainingIgnoreCase("NonExistent");
         verify(newsEntityMapper).toModelList(Arrays.asList());
+    }
+
+    @Test
+    void findAll_WithPageable_ShouldReturnPagedResults() {
+        // Given
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("creationDate").descending());
+        Page<News> newsPage = new PageImpl<>(Arrays.asList(newsEntity), pageable, 1);
+        when(newsRepository.findAll(pageable)).thenReturn(newsPage);
+        when(newsEntityMapper.toModel(newsEntity)).thenReturn(newsModel);
+
+        // When
+        Page<NewsModel> result = newsService.findAll(pageable);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        assertThat(result.getNumber()).isEqualTo(0);
+        assertThat(result.getSize()).isEqualTo(10);
+        assertThat(result.getContent().get(0).getId()).isEqualTo(1L);
+        verify(newsRepository).findAll(pageable);
+    }
+
+    @Test
+    void findAll_WithEmptyPage_ShouldReturnEmptyPage() {
+        // Given
+        Pageable pageable = PageRequest.of(1, 10);
+        Page<News> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
+        when(newsRepository.findAll(pageable)).thenReturn(emptyPage);
+
+        // When
+        Page<NewsModel> result = newsService.findAll(pageable);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.getTotalElements()).isEqualTo(0);
+        assertThat(result.getNumber()).isEqualTo(1);
+        assertThat(result.getSize()).isEqualTo(10);
+        verify(newsRepository).findAll(pageable);
+    }
+
+    @Test
+    void findAll_WithDifferentSortOrders_ShouldReturnSortedResults() {
+        // Given
+        Pageable pageableAsc = PageRequest.of(0, 5, Sort.by("title").ascending());
+        Page<News> newsPageAsc = new PageImpl<>(Arrays.asList(newsEntity), pageableAsc, 1);
+        when(newsRepository.findAll(pageableAsc)).thenReturn(newsPageAsc);
+        when(newsEntityMapper.toModel(newsEntity)).thenReturn(newsModel);
+
+        // When
+        Page<NewsModel> result = newsService.findAll(pageableAsc);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getSort().getOrderFor("title")).isNotNull();
+        assertThat(result.getSort().getOrderFor("title").getDirection()).isEqualTo(Sort.Direction.ASC);
+        verify(newsRepository).findAll(pageableAsc);
+    }
+
+    @Test
+    void findAll_WithMultipleSortCriteria_ShouldReturnSortedResults() {
+        // Given
+        Sort multiSort = Sort.by(Sort.Order.desc("creationDate"), Sort.Order.asc("title"));
+        Pageable pageable = PageRequest.of(0, 10, multiSort);
+        Page<News> newsPage = new PageImpl<>(Arrays.asList(newsEntity), pageable, 1);
+        when(newsRepository.findAll(pageable)).thenReturn(newsPage);
+        when(newsEntityMapper.toModel(newsEntity)).thenReturn(newsModel);
+
+        // When
+        Page<NewsModel> result = newsService.findAll(pageable);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getSort().isSorted()).isTrue();
+        assertThat(result.getSort().getOrderFor("creationDate").getDirection()).isEqualTo(Sort.Direction.DESC);
+        assertThat(result.getSort().getOrderFor("title").getDirection()).isEqualTo(Sort.Direction.ASC);
+        verify(newsRepository).findAll(pageable);
     }
 }

@@ -3,9 +3,11 @@ package com.dev.news.newsportal.mapper.api;
 import com.dev.news.newsportal.api.model.news.NewsListItem;
 import com.dev.news.newsportal.api.model.news.NewsRequest;
 import com.dev.news.newsportal.api.model.news.NewsResponse;
+import com.dev.news.newsportal.api.model.news.PagedNewsListResponse;
 import com.dev.news.newsportal.model.NewsModel;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.springframework.data.domain.Page;
 
 import java.net.URI;
 import java.time.LocalDateTime;
@@ -40,6 +42,19 @@ public interface NewsApiMapper {
     List<NewsResponse> toResponseList(List<NewsModel> newsModels);
 
     List<NewsListItem> toListItemList(List<NewsModel> newsModels);
+
+    // Pagination mapping
+    @Mapping(target = "content", expression = "java(toListItemList(newsPage.getContent()))")
+    @Mapping(target = "totalElements", source = "totalElements")
+    @Mapping(target = "totalPages", source = "totalPages")
+    @Mapping(target = "size", source = "size")
+    @Mapping(target = "number", source = "number")
+    @Mapping(target = "numberOfElements", source = "numberOfElements")
+    @Mapping(target = "first", source = "first")
+    @Mapping(target = "last", source = "last")
+    @Mapping(target = "empty", source = "empty")
+    @Mapping(target = "pageable", source = "pageable")
+    PagedNewsListResponse toPagedResponse(Page<NewsModel> newsPage);
 
     // Helper methods for conversions
     default OffsetDateTime toOffsetDateTime(LocalDateTime localDateTime) {

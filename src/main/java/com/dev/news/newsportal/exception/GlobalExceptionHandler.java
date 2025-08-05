@@ -1,6 +1,8 @@
 package com.dev.news.newsportal.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -10,6 +12,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.util.stream.Collectors;
 
 /**
  * Global exception handler for the application.
@@ -54,6 +58,32 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Object> handleValidationException(ValidationException ex) {
         String requestPath = getRequestPath();
         Object errorResponse = createErrorResponseForPath(requestPath, HttpStatus.BAD_REQUEST, ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * Handles ConstraintViolationException (validation errors from @Min, @Max, etc. on request parameters)
+     * and returns a 400 Bad Request response.
+     *
+     * @param ex the exception
+     * @return ResponseEntity with error details
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Object> handleConstraintViolationException(ConstraintViolationException ex) {
+        String requestPath = getRequestPath();
+        
+        // Build validation error message from constraint violations
+        String errorMessage = ex.getConstraintViolations().stream()
+                .map(ConstraintViolation::getMessage)
+                .collect(Collectors.joining(", "));
+        
+        if (errorMessage.isEmpty()) {
+            errorMessage = "Invalid request parameters";
+        } else {
+            errorMessage = "Invalid request parameters: " + errorMessage;
+        }
+        
+        Object errorResponse = createErrorResponseForPath(requestPath, HttpStatus.BAD_REQUEST, errorMessage);
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
 

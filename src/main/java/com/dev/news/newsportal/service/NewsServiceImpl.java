@@ -8,6 +8,8 @@ import com.dev.news.newsportal.mapper.entity.UserEntityMapper;
 import com.dev.news.newsportal.model.NewsModel;
 import com.dev.news.newsportal.repository.NewsRepository;
 import com.dev.news.newsportal.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,13 @@ class NewsServiceImpl implements NewsService {
     public List<NewsModel> findAll() {
         List<News> newsEntities = newsRepository.findAll();
         return newsEntityMapper.toModelList(newsEntities);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<NewsModel> findAll(Pageable pageable) {
+        Page<News> newsEntities = newsRepository.findAll(pageable);
+        return newsEntities.map(newsEntityMapper::toModel);
     }
 
     @Override
