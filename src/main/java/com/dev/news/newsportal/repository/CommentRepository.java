@@ -9,16 +9,16 @@ import java.util.List;
 
 @Repository
 public interface CommentRepository extends JpaRepository<Comment, Long> {
-    
+
     List<Comment> findByNews(News news);
-    
+
     List<Comment> findByNewsOrderByCreationDateDesc(News news);
-    
+
     List<Comment> findByParentCommentIsNull();
-    
+
     List<Comment> findByParentComment(Comment parentComment);
-    
+
     List<Comment> findByAuthorNickname(String authorNickname);
-    
+
     long countByNews(News news);
 }

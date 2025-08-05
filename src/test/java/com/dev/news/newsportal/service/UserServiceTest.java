@@ -1,11 +1,10 @@
 package com.dev.news.newsportal.service;
 
-import com.dev.news.newsportal.dto.request.UserRequestDto;
-import com.dev.news.newsportal.dto.response.UserResponseDto;
 import com.dev.news.newsportal.entity.User;
 import com.dev.news.newsportal.exception.DuplicateResourceException;
 import com.dev.news.newsportal.exception.ResourceNotFoundException;
-import com.dev.news.newsportal.mapper.UserMapper;
+import com.dev.news.newsportal.mapper.entity.UserEntityMapper;
+import com.dev.news.newsportal.model.UserModel;
 import com.dev.news.newsportal.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,10 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -37,52 +33,51 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private UserMapper userMapper;
+    private UserEntityMapper userEntityMapper;
 
     @InjectMocks
     private UserServiceImpl userService;
 
-    private User user;
-    private UserRequestDto userRequestDto;
-    private UserResponseDto userResponseDto;
+    private User userEntity;
+    private UserModel userModel;
 
     @BeforeEach
     void setUp() {
-        // Set up test data
-        user = User.builder()
+        // Set up entity data
+        userEntity = User.builder()
                 .id(1L)
                 .nickname("testuser")
                 .email("test@example.com")
-                .role("ROLE_USER")
+                .role("USER")
                 .build();
 
-        userRequestDto = UserRequestDto.builder()
-                .nickname("testuser")
-                .email("test@example.com")
-                .role("ROLE_USER")
-                .build();
-
-        userResponseDto = UserResponseDto.builder()
+        // Set up domain model data
+        userModel = UserModel.builder()
                 .id(1L)
                 .nickname("testuser")
                 .email("test@example.com")
-                .role("ROLE_USER")
+                .role("USER")
                 .build();
     }
 
     @Test
-    void findById_withExistingId_shouldReturnUserResponseDto() {
+    void findById_withExistingId_shouldReturnUserModel() {
         // Given
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userMapper.toResponseDto(user)).thenReturn(userResponseDto);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(userEntity));
+        when(userEntityMapper.toModel(userEntity)).thenReturn(userModel);
 
         // When
-        UserResponseDto result = userService.findById(1L);
+        UserModel result = userService.findById(1L);
 
         // Then
-        assertThat(result).isEqualTo(userResponseDto);
+        assertThat(result).isNotNull();
+        assertThat(result.getId()).isEqualTo(1L);
+        assertThat(result.getNickname()).isEqualTo("testuser");
+        assertThat(result.getEmail()).isEqualTo("test@example.com");
+        assertThat(result.getRole()).isEqualTo("USER");
+
         verify(userRepository).findById(1L);
-        verify(userMapper).toResponseDto(user);
+        verify(userEntityMapper).toModel(userEntity);
     }
 
     @Test
@@ -93,204 +88,218 @@ class UserServiceTest {
         // When/Then
         assertThatThrownBy(() -> userService.findById(999L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("User not found with id: 999");
+                .hasMessage("User not found with id: 999");
 
         verify(userRepository).findById(999L);
-        verify(userMapper, never()).toResponseDto(any());
+        verify(userEntityMapper, never()).toModel(any(User.class));
     }
 
     @Test
-    void findAll_shouldReturnListOfUserResponseDto() {
+    void findAll_shouldReturnListOfUserModels() {
         // Given
-        User user2 = User.builder()
-                .id(2L)
-                .nickname("anotheruser")
-                .email("another@example.com")
-                .role("ROLE_ADMIN")
-                .build();
-
-        UserResponseDto userResponseDto2 = UserResponseDto.builder()
-                .id(2L)
-                .nickname("anotheruser")
-                .email("another@example.com")
-                .role("ROLE_ADMIN")
-                .build();
-
-        List<User> users = Arrays.asList(user, user2);
-        
-        when(userRepository.findAll()).thenReturn(users);
-        when(userMapper.toResponseDto(user)).thenReturn(userResponseDto);
-        when(userMapper.toResponseDto(user2)).thenReturn(userResponseDto2);
+        List<User> userEntities = Arrays.asList(userEntity);
+        List<UserModel> userModels = Arrays.asList(userModel);
+        when(userRepository.findAll()).thenReturn(userEntities);
+        when(userEntityMapper.toModelList(userEntities)).thenReturn(userModels);
 
         // When
-        List<UserResponseDto> result = userService.findAll();
+        List<UserModel> result = userService.findAll();
 
         // Then
-        assertThat(result).hasSize(2);
-        assertThat(result).containsExactly(userResponseDto, userResponseDto2);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(1L);
+        assertThat(result.get(0).getNickname()).isEqualTo("testuser");
+
         verify(userRepository).findAll();
-        verify(userMapper, times(2)).toResponseDto(any(User.class));
+        verify(userEntityMapper).toModelList(userEntities);
     }
 
     @Test
-    void create_withUniqueFields_shouldReturnCreatedUserResponseDto() {
+    void create_withValidUserModel_shouldReturnCreatedUserModel() {
         // Given
-        when(userRepository.existsByNickname(userRequestDto.getNickname())).thenReturn(false);
-        when(userRepository.existsByEmail(userRequestDto.getEmail())).thenReturn(false);
-        when(userMapper.toEntity(userRequestDto)).thenReturn(user);
-        when(userRepository.save(user)).thenReturn(user);
-        when(userMapper.toResponseDto(user)).thenReturn(userResponseDto);
+        UserModel inputModel = UserModel.builder()
+                .nickname("newuser")
+                .email("newuser@example.com")
+                .role("USER")
+                .build();
+
+        User inputEntity = User.builder()
+                .nickname("newuser")
+                .email("newuser@example.com")
+                .role("USER")
+                .build();
+
+        User savedEntity = User.builder()
+                .id(2L)
+                .nickname("newuser")
+                .email("newuser@example.com")
+                .role("USER")
+                .build();
+
+        UserModel savedModel = UserModel.builder()
+                .id(2L)
+                .nickname("newuser")
+                .email("newuser@example.com")
+                .role("USER")
+                .build();
+
+        when(userRepository.existsByNickname("newuser")).thenReturn(false);
+        when(userRepository.existsByEmail("newuser@example.com")).thenReturn(false);
+        when(userEntityMapper.toEntity(inputModel)).thenReturn(inputEntity);
+        when(userRepository.save(any(User.class))).thenReturn(savedEntity);
+        when(userEntityMapper.toModel(savedEntity)).thenReturn(savedModel);
 
         // When
-        UserResponseDto result = userService.create(userRequestDto);
+        UserModel result = userService.create(inputModel);
 
         // Then
-        assertThat(result).isEqualTo(userResponseDto);
-        verify(userRepository).existsByNickname(userRequestDto.getNickname());
-        verify(userRepository).existsByEmail(userRequestDto.getEmail());
-        verify(userMapper).toEntity(userRequestDto);
-        verify(userRepository).save(user);
-        verify(userMapper).toResponseDto(user);
+        assertThat(result).isNotNull();
+        assertThat(result.getId()).isEqualTo(2L);
+        assertThat(result.getNickname()).isEqualTo("newuser");
+        assertThat(result.getEmail()).isEqualTo("newuser@example.com");
+
+        verify(userRepository).existsByNickname("newuser");
+        verify(userRepository).existsByEmail("newuser@example.com");
+        verify(userEntityMapper).toEntity(inputModel);
+        verify(userRepository).save(any(User.class));
+        verify(userEntityMapper).toModel(savedEntity);
     }
 
     @Test
     void create_withDuplicateNickname_shouldThrowDuplicateResourceException() {
         // Given
-        when(userRepository.existsByNickname(userRequestDto.getNickname())).thenReturn(true);
-        when(userRepository.findByNickname(userRequestDto.getNickname())).thenReturn(Optional.of(user));
+        UserModel inputModel = UserModel.builder()
+                .nickname("testuser")
+                .email("newemail@example.com")
+                .role("USER")
+                .build();
+
+        when(userRepository.existsByNickname("testuser")).thenReturn(true);
+        when(userRepository.findByNickname("testuser")).thenReturn(Optional.of(userEntity));
 
         // When/Then
-        assertThatThrownBy(() -> userService.create(userRequestDto))
+        assertThatThrownBy(() -> userService.create(inputModel))
                 .isInstanceOf(DuplicateResourceException.class)
-                .hasMessageContaining("User with nickname: testuser already exists");
+                .hasMessage("User with nickname: testuser already exists");
 
-        verify(userRepository).existsByNickname(userRequestDto.getNickname());
-        verify(userRepository).findByNickname(userRequestDto.getNickname());
-        verify(userMapper, never()).toEntity(any());
-        verify(userRepository, never()).save(any());
+        verify(userRepository).existsByNickname("testuser");
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
     void create_withDuplicateEmail_shouldThrowDuplicateResourceException() {
         // Given
-        when(userRepository.existsByNickname(userRequestDto.getNickname())).thenReturn(false);
-        when(userRepository.existsByEmail(userRequestDto.getEmail())).thenReturn(true);
-        when(userRepository.findByEmail(userRequestDto.getEmail())).thenReturn(Optional.of(user));
+        UserModel inputModel = UserModel.builder()
+                .nickname("newuser")
+                .email("test@example.com")
+                .role("USER")
+                .build();
+
+        when(userRepository.existsByNickname("newuser")).thenReturn(false);
+        when(userRepository.existsByEmail("test@example.com")).thenReturn(true);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(userEntity));
 
         // When/Then
-        assertThatThrownBy(() -> userService.create(userRequestDto))
+        assertThatThrownBy(() -> userService.create(inputModel))
                 .isInstanceOf(DuplicateResourceException.class)
-                .hasMessageContaining("User with email: test@example.com already exists");
+                .hasMessage("User with email: test@example.com already exists");
 
-        verify(userRepository).existsByNickname(userRequestDto.getNickname());
-        verify(userRepository).existsByEmail(userRequestDto.getEmail());
-        verify(userRepository).findByEmail(userRequestDto.getEmail());
-        verify(userMapper, never()).toEntity(any());
-        verify(userRepository, never()).save(any());
+        verify(userRepository).existsByNickname("newuser");
+        verify(userRepository).existsByEmail("test@example.com");
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
-    void update_withExistingIdAndUniqueFields_shouldReturnUpdatedUserResponseDto() {
+    void update_withExistingIdAndValidData_shouldReturnUpdatedUserModel() {
         // Given
-        User existingUser = User.builder()
+        UserModel updateModel = UserModel.builder()
+                .nickname("updateduser")
+                .email("updated@example.com")
+                .role("ADMIN")
+                .build();
+
+        User updatedEntity = User.builder()
                 .id(1L)
-                .nickname("oldnickname")
-                .email("old@example.com")
-                .role("ROLE_USER")
+                .nickname("updateduser")
+                .email("updated@example.com")
+                .role("ADMIN")
                 .build();
 
-        UserRequestDto updateDto = UserRequestDto.builder()
-                .nickname("newnickname")
-                .email("new@example.com")
-                .role("ROLE_ADMIN")
-                .build();
-
-        User updatedUser = User.builder()
+        UserModel updatedModel = UserModel.builder()
                 .id(1L)
-                .nickname("newnickname")
-                .email("new@example.com")
-                .role("ROLE_ADMIN")
+                .nickname("updateduser")
+                .email("updated@example.com")
+                .role("ADMIN")
                 .build();
 
-        UserResponseDto updatedResponseDto = UserResponseDto.builder()
-                .id(1L)
-                .nickname("newnickname")
-                .email("new@example.com")
-                .role("ROLE_ADMIN")
-                .build();
-
-        when(userRepository.findById(1L)).thenReturn(Optional.of(existingUser));
-        when(userRepository.existsByNickname(updateDto.getNickname())).thenReturn(false);
-        when(userRepository.existsByEmail(updateDto.getEmail())).thenReturn(false);
-        doNothing().when(userMapper).updateEntityFromDto(updateDto, existingUser);
-        when(userRepository.save(existingUser)).thenReturn(updatedUser);
-        when(userMapper.toResponseDto(updatedUser)).thenReturn(updatedResponseDto);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(userEntity));
+        when(userRepository.existsByNickname("updateduser")).thenReturn(false);
+        when(userRepository.existsByEmail("updated@example.com")).thenReturn(false);
+        when(userRepository.save(any(User.class))).thenReturn(updatedEntity);
+        when(userEntityMapper.toModel(updatedEntity)).thenReturn(updatedModel);
 
         // When
-        UserResponseDto result = userService.update(1L, updateDto);
+        UserModel result = userService.update(1L, updateModel);
 
         // Then
-        assertThat(result).isEqualTo(updatedResponseDto);
+        assertThat(result).isNotNull();
+        assertThat(result.getId()).isEqualTo(1L);
+        assertThat(result.getNickname()).isEqualTo("updateduser");
+        assertThat(result.getEmail()).isEqualTo("updated@example.com");
+        assertThat(result.getRole()).isEqualTo("ADMIN");
+
         verify(userRepository).findById(1L);
-        verify(userRepository).existsByNickname(updateDto.getNickname());
-        verify(userRepository).existsByEmail(updateDto.getEmail());
-        verify(userMapper).updateEntityFromDto(updateDto, existingUser);
-        verify(userRepository).save(existingUser);
-        verify(userMapper).toResponseDto(updatedUser);
+        verify(userRepository).save(any(User.class));
+        verify(userEntityMapper).toModel(updatedEntity);
     }
 
     @Test
     void update_withNonExistingId_shouldThrowResourceNotFoundException() {
         // Given
+        UserModel updateModel = UserModel.builder()
+                .nickname("updateduser")
+                .email("updated@example.com")
+                .role("ADMIN")
+                .build();
+
         when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
         // When/Then
-        assertThatThrownBy(() -> userService.update(999L, userRequestDto))
+        assertThatThrownBy(() -> userService.update(999L, updateModel))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("User not found with id: 999");
+                .hasMessage("User not found with id: 999");
 
         verify(userRepository).findById(999L);
-        verify(userMapper, never()).updateEntityFromDto(any(), any());
-        verify(userRepository, never()).save(any());
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
     void update_withDuplicateNickname_shouldThrowDuplicateResourceException() {
         // Given
-        User existingUser = User.builder()
-                .id(1L)
-                .nickname("oldnickname")
-                .email("old@example.com")
-                .role("ROLE_USER")
+        UserModel updateModel = UserModel.builder()
+                .nickname("existinguser")
+                .email("updated@example.com")
+                .role("ADMIN")
                 .build();
 
-        User anotherUser = User.builder()
+        User existingUserWithNickname = User.builder()
                 .id(2L)
-                .nickname("newnickname")
-                .email("another@example.com")
-                .role("ROLE_USER")
+                .nickname("existinguser")
+                .email("existing@example.com")
+                .role("USER")
                 .build();
 
-        UserRequestDto updateDto = UserRequestDto.builder()
-                .nickname("newnickname")
-                .email("new@example.com")
-                .role("ROLE_ADMIN")
-                .build();
-
-        when(userRepository.findById(1L)).thenReturn(Optional.of(existingUser));
-        when(userRepository.existsByNickname(updateDto.getNickname())).thenReturn(true);
-        when(userRepository.findByNickname(updateDto.getNickname())).thenReturn(Optional.of(anotherUser));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(userEntity));
+        when(userRepository.existsByNickname("existinguser")).thenReturn(true);
+        when(userRepository.findByNickname("existinguser")).thenReturn(Optional.of(existingUserWithNickname));
 
         // When/Then
-        assertThatThrownBy(() -> userService.update(1L, updateDto))
+        assertThatThrownBy(() -> userService.update(1L, updateModel))
                 .isInstanceOf(DuplicateResourceException.class)
-                .hasMessageContaining("User with nickname: newnickname already exists");
+                .hasMessage("User with nickname: existinguser already exists");
 
         verify(userRepository).findById(1L);
-        verify(userRepository).existsByNickname(updateDto.getNickname());
-        verify(userRepository).findByNickname(updateDto.getNickname());
-        verify(userMapper, never()).updateEntityFromDto(any(), any());
-        verify(userRepository, never()).save(any());
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
@@ -314,25 +323,27 @@ class UserServiceTest {
         // When/Then
         assertThatThrownBy(() -> userService.delete(999L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("User not found with id: 999");
+                .hasMessage("User not found with id: 999");
 
         verify(userRepository).existsById(999L);
         verify(userRepository, never()).deleteById(anyLong());
     }
 
     @Test
-    void findByNickname_withExistingNickname_shouldReturnUserResponseDto() {
+    void findByNickname_withExistingNickname_shouldReturnUserModel() {
         // Given
-        when(userRepository.findByNickname("testuser")).thenReturn(Optional.of(user));
-        when(userMapper.toResponseDto(user)).thenReturn(userResponseDto);
+        when(userRepository.findByNickname("testuser")).thenReturn(Optional.of(userEntity));
+        when(userEntityMapper.toModel(userEntity)).thenReturn(userModel);
 
         // When
-        UserResponseDto result = userService.findByNickname("testuser");
+        UserModel result = userService.findByNickname("testuser");
 
         // Then
-        assertThat(result).isEqualTo(userResponseDto);
+        assertThat(result).isNotNull();
+        assertThat(result.getNickname()).isEqualTo("testuser");
+
         verify(userRepository).findByNickname("testuser");
-        verify(userMapper).toResponseDto(user);
+        verify(userEntityMapper).toModel(userEntity);
     }
 
     @Test
@@ -343,25 +354,27 @@ class UserServiceTest {
         // When/Then
         assertThatThrownBy(() -> userService.findByNickname("nonexistent"))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("User not found with nickname: nonexistent");
+                .hasMessage("User not found with nickname: nonexistent");
 
         verify(userRepository).findByNickname("nonexistent");
-        verify(userMapper, never()).toResponseDto(any());
+        verify(userEntityMapper, never()).toModel(any(User.class));
     }
 
     @Test
-    void findByEmail_withExistingEmail_shouldReturnUserResponseDto() {
+    void findByEmail_withExistingEmail_shouldReturnUserModel() {
         // Given
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
-        when(userMapper.toResponseDto(user)).thenReturn(userResponseDto);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(userEntity));
+        when(userEntityMapper.toModel(userEntity)).thenReturn(userModel);
 
         // When
-        UserResponseDto result = userService.findByEmail("test@example.com");
+        UserModel result = userService.findByEmail("test@example.com");
 
         // Then
-        assertThat(result).isEqualTo(userResponseDto);
+        assertThat(result).isNotNull();
+        assertThat(result.getEmail()).isEqualTo("test@example.com");
+
         verify(userRepository).findByEmail("test@example.com");
-        verify(userMapper).toResponseDto(user);
+        verify(userEntityMapper).toModel(userEntity);
     }
 
     @Test
@@ -372,9 +385,9 @@ class UserServiceTest {
         // When/Then
         assertThatThrownBy(() -> userService.findByEmail("nonexistent@example.com"))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("User not found with email: nonexistent@example.com");
+                .hasMessage("User not found with email: nonexistent@example.com");
 
         verify(userRepository).findByEmail("nonexistent@example.com");
-        verify(userMapper, never()).toResponseDto(any());
+        verify(userEntityMapper, never()).toModel(any(User.class));
     }
 }

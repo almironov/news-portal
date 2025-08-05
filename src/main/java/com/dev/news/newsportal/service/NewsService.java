@@ -1,24 +1,22 @@
 package com.dev.news.newsportal.service;
 
-import com.dev.news.newsportal.dto.request.NewsRequestDto;
-import com.dev.news.newsportal.dto.response.NewsListItemDto;
-import com.dev.news.newsportal.dto.response.NewsResponseDto;
+import com.dev.news.newsportal.model.NewsModel;
 
 import java.util.List;
 
 public interface NewsService {
-    
-    NewsResponseDto findById(Long id);
-    
-    List<NewsListItemDto> findAll();
-    
-    NewsResponseDto create(NewsRequestDto dto);
-    
-    NewsResponseDto update(Long id, NewsRequestDto dto);
-    
+
+    NewsModel findById(Long id);
+
+    List<NewsModel> findAll();
+
+    NewsModel create(NewsModel newsModel);
+
+    NewsModel update(Long id, NewsModel newsModel);
+
     void delete(Long id);
-    
-    List<NewsListItemDto> findByAuthor(Long authorId);
-    
-    List<NewsListItemDto> findByTitle(String titlePart);
+
+    List<NewsModel> findByAuthor(Long authorId);
+
+    List<NewsModel> findByTitle(String titlePart);
 }

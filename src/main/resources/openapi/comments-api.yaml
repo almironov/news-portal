@@ -1,0 +1,363 @@
+openapi: 3.0.3
+info:
+  title: Comments API
+  description: API for managing comments in the News Portal
+  version: 1.0.0
+  contact:
+    name: News Portal Team
+    email: support@newsportal.com
+
+servers:
+  - url: http://localhost:8080
+    description: Development server
+
+paths:
+  /api/v1/comments/{id}:
+    get:
+      summary: Get comment by ID
+      description: Retrieve a specific comment by its ID
+      operationId: getCommentById
+      tags:
+        - Comments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the comment to retrieve
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Comment retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentResponse'
+        '404':
+          description: Comment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    put:
+      summary: Update comment
+      description: Update an existing comment
+      operationId: updateComment
+      tags:
+        - Comments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the comment to update
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentRequest'
+      responses:
+        '200':
+          description: Comment updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Comment, news article, or author not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    delete:
+      summary: Delete comment
+      description: Delete a comment by its ID
+      operationId: deleteComment
+      tags:
+        - Comments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the comment to delete
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '204':
+          description: Comment deleted successfully
+        '404':
+          description: Comment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/comments:
+    post:
+      summary: Create a new comment
+      description: Create a new comment on a news article
+      operationId: createComment
+      tags:
+        - Comments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentRequest'
+      responses:
+        '201':
+          description: Comment created successfully
+          headers:
+            Location:
+              description: URL of the created comment
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: News article, author, or parent comment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/comments/news/{newsId}:
+    get:
+      summary: Get comments by news article
+      description: Retrieve all comments for a specific news article
+      operationId: getCommentsByNews
+      tags:
+        - Comments
+      parameters:
+        - name: newsId
+          in: path
+          required: true
+          description: ID of the news article
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Comments retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CommentListItem'
+        '404':
+          description: News article not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/comments/{id}/replies:
+    get:
+      summary: Get comment replies
+      description: Retrieve all replies to a specific comment
+      operationId: getCommentReplies
+      tags:
+        - Comments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the parent comment
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Comment replies retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CommentListItem'
+        '404':
+          description: Parent comment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    CommentRequest:
+      type: object
+      required:
+        - text
+        - authorNickname
+        - newsId
+      properties:
+        text:
+          type: string
+          minLength: 1
+          description: Content of the comment
+          example: "This is a great article! Thanks for sharing."
+        authorNickname:
+          type: string
+          minLength: 1
+          description: Nickname of the comment author
+          example: "john_doe"
+        newsId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: ID of the news article being commented on
+          example: 1
+        parentCommentId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: ID of the parent comment (for replies)
+          example: 5
+
+    CommentResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier of the comment
+          example: 1
+        text:
+          type: string
+          description: Content of the comment
+          example: "This is a great article! Thanks for sharing."
+        creationDate:
+          type: string
+          format: date-time
+          description: Date and time when the comment was created
+          example: "2023-12-01T10:30:00Z"
+        authorNickname:
+          type: string
+          description: Nickname of the comment author
+          example: "john_doe"
+        replies:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommentListItem'
+          description: List of replies to this comment
+          default: []
+
+    CommentListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier of the comment
+          example: 1
+        text:
+          type: string
+          description: Content of the comment
+          example: "This is a great article! Thanks for sharing."
+        creationDate:
+          type: string
+          format: date-time
+          description: Date and time when the comment was created
+          example: "2023-12-01T10:30:00Z"
+        authorNickname:
+          type: string
+          description: Nickname of the comment author
+          example: "john_doe"
+        hasReplies:
+          type: boolean
+          description: Whether this comment has replies
+          example: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp when the error occurred
+          example: "2023-12-01T10:30:00Z"
+        status:
+          type: integer
+          description: HTTP status code
+          example: 400
+        error:
+          type: string
+          description: Error type
+          example: "Bad Request"
+        message:
+          type: string
+          description: Error message
+          example: "Text is required"
+        path:
+          type: string
+          description: Request path that caused the error
+          example: "/api/v1/comments"
+
+tags:
+  - name: Comments
+    description: Operations related to comment management

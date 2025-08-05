@@ -1,67 +1,95 @@
 package com.dev.news.newsportal.controller;
 
-import com.dev.news.newsportal.dto.request.UserRequestDto;
-import com.dev.news.newsportal.dto.response.UserResponseDto;
+import com.dev.news.newsportal.api.model.users.UserRequest;
+import com.dev.news.newsportal.api.model.users.UserResponse;
+import com.dev.news.newsportal.api.users.UsersApi;
+import com.dev.news.newsportal.mapper.api.UserApiMapper;
+import com.dev.news.newsportal.model.UserModel;
 import com.dev.news.newsportal.service.UserService;
-import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/users")
-class UserController {
-    
+class UserController implements UsersApi {
+
     private final UserService userService;
-    
-    UserController(UserService userService) {
+    private final UserApiMapper userApiMapper;
+
+    UserController(UserService userService, UserApiMapper userApiMapper) {
         this.userService = userService;
+        this.userApiMapper = userApiMapper;
     }
-    
-    @GetMapping
-    ResponseEntity<List<UserResponseDto>> getAllUsers() {
-        return ResponseEntity.ok(userService.findAll());
+
+    @Override
+    public ResponseEntity<List<UserResponse>> getAllUsers() {
+        List<UserModel> userModels = userService.findAll();
+        List<UserResponse> userResponses = userApiMapper.toResponseList(userModels);
+        return ResponseEntity.ok(userResponses);
     }
-    
-    @GetMapping("/{id}")
-    ResponseEntity<UserResponseDto> getUserById(@PathVariable Long id) {
-        return ResponseEntity.ok(userService.findById(id));
+
+    @Override
+    public ResponseEntity<UserResponse> getUserById(Long id) {
+        UserModel userModel = userService.findById(id);
+        UserResponse userResponse = userApiMapper.toResponse(userModel);
+        return ResponseEntity.ok(userResponse);
     }
-    
-    @PostMapping
-    ResponseEntity<UserResponseDto> createUser(@Valid @RequestBody UserRequestDto userRequestDto) {
-        UserResponseDto createdUser = userService.create(userRequestDto);
+
+    @Override
+    public ResponseEntity<UserResponse> createUser(UserRequest userRequest) {
+        // Convert DTO to domain model
+        UserModel userModel = userApiMapper.toModel(userRequest);
+
+        // Create user
+        UserModel createdUserModel = userService.create(userModel);
+
+        // Convert back to DTO
+        UserResponse userResponse = userApiMapper.toResponse(createdUserModel);
+
+        // Create location header
         URI location = ServletUriComponentsBuilder
                 .fromCurrentRequest()
                 .path("/{id}")
-                .buildAndExpand(createdUser.getId())
+                .buildAndExpand(userResponse.getId())
                 .toUri();
-        return ResponseEntity.created(location).body(createdUser);
+
+        return ResponseEntity.created(location).body(userResponse);
     }
-    
-    @PutMapping("/{id}")
-    ResponseEntity<UserResponseDto> updateUser(
-            @PathVariable Long id,
-            @Valid @RequestBody UserRequestDto userRequestDto) {
-        return ResponseEntity.ok(userService.update(id, userRequestDto));
+
+    @Override
+    public ResponseEntity<UserResponse> updateUser(Long id, UserRequest userRequest) {
+        // Convert DTO to domain model
+        UserModel userModel = userApiMapper.toModel(userRequest);
+
+        // Update user
+        UserModel updatedUserModel = userService.update(id, userModel);
+
+        // Convert back to DTO
+        UserResponse userResponse = userApiMapper.toResponse(updatedUserModel);
+
+        return ResponseEntity.ok(userResponse);
     }
-    
-    @DeleteMapping("/{id}")
-    ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+
+    @Override
+    public ResponseEntity<Void> deleteUser(Long id) {
         userService.delete(id);
         return ResponseEntity.noContent().build();
     }
-    
-    @GetMapping("/nickname/{nickname}")
-    ResponseEntity<UserResponseDto> getUserByNickname(@PathVariable String nickname) {
-        return ResponseEntity.ok(userService.findByNickname(nickname));
+
+    @Override
+    public ResponseEntity<UserResponse> getUserByNickname(String nickname) {
+        UserModel userModel = userService.findByNickname(nickname);
+        UserResponse userResponse = userApiMapper.toResponse(userModel);
+        return ResponseEntity.ok(userResponse);
     }
-    
-    @GetMapping("/email/{email}")
-    ResponseEntity<UserResponseDto> getUserByEmail(@PathVariable String email) {
-        return ResponseEntity.ok(userService.findByEmail(email));
+
+    @Override
+    public ResponseEntity<UserResponse> getUserByEmail(String email) {
+        UserModel userModel = userService.findByEmail(email);
+        UserResponse userResponse = userApiMapper.toResponse(userModel);
+        return ResponseEntity.ok(userResponse);
     }
 }

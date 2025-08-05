@@ -5,7 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -33,7 +32,7 @@ public class News {
 
     @Column(nullable = false)
     private LocalDateTime creationDate;
-    
+
     @PrePersist
     public void prePersist() {
         if (creationDate == null) {

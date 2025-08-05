@@ -1,10 +1,13 @@
 package com.dev.news.newsportal.controller;
 
-import com.dev.news.newsportal.dto.request.NewsRequestDto;
-import com.dev.news.newsportal.dto.response.NewsListItemDto;
-import com.dev.news.newsportal.dto.response.NewsResponseDto;
-import com.dev.news.newsportal.dto.response.UserSummaryDto;
+import com.dev.news.newsportal.api.model.news.NewsListItem;
+import com.dev.news.newsportal.api.model.news.NewsRequest;
+import com.dev.news.newsportal.api.model.news.NewsResponse;
+import com.dev.news.newsportal.api.model.news.UserSummary;
 import com.dev.news.newsportal.exception.ResourceNotFoundException;
+import com.dev.news.newsportal.mapper.api.NewsApiMapper;
+import com.dev.news.newsportal.model.NewsModel;
+import com.dev.news.newsportal.model.UserModel;
 import com.dev.news.newsportal.service.NewsService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,53 +53,73 @@ class NewsControllerTest {
     @MockBean
     private NewsService newsService;
 
-    private NewsRequestDto newsRequestDto;
-    private NewsResponseDto newsResponseDto;
-    private NewsListItemDto newsListItemDto;
-    private UserSummaryDto authorSummaryDto;
+    @MockBean
+    private NewsApiMapper newsApiMapper;
+
+    private NewsRequest newsRequest;
+    private NewsResponse newsResponse;
+    private NewsListItem newsListItem;
+    private UserSummary authorSummary;
+    private NewsModel newsModel;
+    private UserModel authorModel;
     private LocalDateTime creationDate;
 
     @BeforeEach
     void setUp() {
         creationDate = LocalDateTime.now();
         
-        authorSummaryDto = UserSummaryDto.builder()
+        // Create domain models for service mocking
+        authorModel = UserModel.builder()
                 .id(1L)
                 .nickname("testuser")
+                .email("test@example.com")
+                .role("USER")
                 .build();
 
-        newsRequestDto = NewsRequestDto.builder()
-                .title("Test News")
-                .text("This is a test news article")
-                .imageUrl("https://example.com/image.jpg")
-                .authorId(1L)
-                .build();
-
-        newsResponseDto = NewsResponseDto.builder()
+        newsModel = NewsModel.builder()
                 .id(1L)
                 .title("Test News")
                 .text("This is a test news article")
                 .imageUrl("https://example.com/image.jpg")
                 .creationDate(creationDate)
-                .author(authorSummaryDto)
-                .commentCount(0)
+                .author(authorModel)
+                .comments(Arrays.asList())
                 .build();
 
-        newsListItemDto = NewsListItemDto.builder()
+        // Create OpenAPI DTOs for request/response
+        authorSummary = new UserSummary()
+                .id(1L)
+                .nickname("testuser");
+
+        newsRequest = new NewsRequest("Test News", "This is a test news article", 1L)
+                .imageUrl(java.net.URI.create("https://example.com/image.jpg"));
+
+        newsResponse = new NewsResponse()
                 .id(1L)
                 .title("Test News")
-                .imageUrl("https://example.com/image.jpg")
-                .creationDate(creationDate)
-                .author(authorSummaryDto)
-                .commentCount(0)
-                .build();
+                .text("This is a test news article")
+                .imageUrl(java.net.URI.create("https://example.com/image.jpg"))
+                .creationDate(creationDate.atOffset(java.time.ZoneOffset.UTC))
+                .author(authorSummary)
+                .commentCount(0L);
+
+        newsListItem = new NewsListItem()
+                .id(1L)
+                .title("Test News")
+                .imageUrl(java.net.URI.create("https://example.com/image.jpg"))
+                .creationDate(creationDate.atOffset(java.time.ZoneOffset.UTC))
+                .author(authorSummary)
+                .commentCount(0L);
     }
 
     @Test
     void getAllNews_shouldReturnListOfNewsListItemDto() throws Exception {
         // Given
-        List<NewsListItemDto> newsList = Arrays.asList(newsListItemDto);
-        when(newsService.findAll()).thenReturn(newsList);
+        List<NewsModel> newsModels = Arrays.asList(newsModel);
+        List<NewsListItem> newsListItems = Arrays.asList(newsListItem);
+        
+        when(newsService.findAll()).thenReturn(newsModels);
+        when(newsApiMapper.toListItemList(newsModels)).thenReturn(newsListItems);
 
         // When/Then
         mockMvc.perform(get("/api/v1/news"))
@@ -110,12 +133,14 @@ class NewsControllerTest {
                 .andExpect(jsonPath("$[0].commentCount", is(0)));
 
         verify(newsService).findAll();
+        verify(newsApiMapper).toListItemList(newsModels);
     }
 
     @Test
     void getNewsById_withExistingId_shouldReturnNewsResponseDto() throws Exception {
         // Given
-        when(newsService.findById(1L)).thenReturn(newsResponseDto);
+        when(newsService.findById(1L)).thenReturn(newsModel);
+        when(newsApiMapper.toResponse(newsModel)).thenReturn(newsResponse);
 
         // When/Then
         mockMvc.perform(get("/api/v1/news/1"))
@@ -129,6 +154,7 @@ class NewsControllerTest {
                 .andExpect(jsonPath("$.commentCount", is(0)));
 
         verify(newsService).findById(1L);
+        verify(newsApiMapper).toResponse(newsModel);
     }
 
     @Test
@@ -146,12 +172,14 @@ class NewsControllerTest {
     @Test
     void createNews_withValidData_shouldReturnCreatedNewsResponseDto() throws Exception {
         // Given
-        when(newsService.create(any(NewsRequestDto.class))).thenReturn(newsResponseDto);
+        when(newsApiMapper.toModel(any(NewsRequest.class))).thenReturn(newsModel);
+        when(newsService.create(any(NewsModel.class))).thenReturn(newsModel);
+        when(newsApiMapper.toResponse(newsModel)).thenReturn(newsResponse);
 
         // When/Then
         mockMvc.perform(post("/api/v1/news")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(newsRequestDto)))
+                .content(objectMapper.writeValueAsString(newsRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "http://localhost/api/v1/news/1"))
                 .andExpect(jsonPath("$.id", is(1)))
@@ -162,36 +190,36 @@ class NewsControllerTest {
                 .andExpect(jsonPath("$.author.nickname", is("testuser")))
                 .andExpect(jsonPath("$.commentCount", is(0)));
 
-        verify(newsService).create(any(NewsRequestDto.class));
+        verify(newsApiMapper).toModel(any(NewsRequest.class));
+        verify(newsService).create(any(NewsModel.class));
+        verify(newsApiMapper).toResponse(newsModel);
     }
 
     @Test
     void createNews_withInvalidData_shouldReturnBadRequest() throws Exception {
         // Given
-        NewsRequestDto invalidDto = NewsRequestDto.builder()
-                .title("") // Invalid: title is required
-                .text("This is a test news article")
-                .authorId(1L)
-                .build();
+        NewsRequest invalidRequest = new NewsRequest("", "This is a test news article", 1L); // Invalid: title is empty
 
         // When/Then
         mockMvc.perform(post("/api/v1/news")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidDto)))
+                .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest());
 
-        verify(newsService, times(0)).create(any(NewsRequestDto.class));
+        verify(newsService, times(0)).create(any(NewsModel.class));
     }
 
     @Test
     void updateNews_withExistingIdAndValidData_shouldReturnUpdatedNewsResponseDto() throws Exception {
         // Given
-        when(newsService.update(eq(1L), any(NewsRequestDto.class))).thenReturn(newsResponseDto);
+        when(newsApiMapper.toModel(any(NewsRequest.class))).thenReturn(newsModel);
+        when(newsService.update(eq(1L), any(NewsModel.class))).thenReturn(newsModel);
+        when(newsApiMapper.toResponse(newsModel)).thenReturn(newsResponse);
 
         // When/Then
         mockMvc.perform(put("/api/v1/news/1")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(newsRequestDto)))
+                .content(objectMapper.writeValueAsString(newsRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.title", is("Test News")))
@@ -201,40 +229,40 @@ class NewsControllerTest {
                 .andExpect(jsonPath("$.author.nickname", is("testuser")))
                 .andExpect(jsonPath("$.commentCount", is(0)));
 
-        verify(newsService).update(eq(1L), any(NewsRequestDto.class));
+        verify(newsApiMapper).toModel(any(NewsRequest.class));
+        verify(newsService).update(eq(1L), any(NewsModel.class));
+        verify(newsApiMapper).toResponse(newsModel);
     }
 
     @Test
     void updateNews_withNonExistingId_shouldReturnNotFound() throws Exception {
         // Given
-        when(newsService.update(eq(999L), any(NewsRequestDto.class)))
+        when(newsApiMapper.toModel(any(NewsRequest.class))).thenReturn(newsModel);
+        when(newsService.update(eq(999L), any(NewsModel.class)))
                 .thenThrow(new ResourceNotFoundException("News", "id", 999L));
 
         // When/Then
         mockMvc.perform(put("/api/v1/news/999")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(newsRequestDto)))
+                .content(objectMapper.writeValueAsString(newsRequest)))
                 .andExpect(status().isNotFound());
 
-        verify(newsService).update(eq(999L), any(NewsRequestDto.class));
+        verify(newsApiMapper).toModel(any(NewsRequest.class));
+        verify(newsService).update(eq(999L), any(NewsModel.class));
     }
 
     @Test
     void updateNews_withInvalidData_shouldReturnBadRequest() throws Exception {
         // Given
-        NewsRequestDto invalidDto = NewsRequestDto.builder()
-                .title("") // Invalid: title is required
-                .text("This is a test news article")
-                .authorId(1L)
-                .build();
+        NewsRequest invalidRequest = new NewsRequest("", "This is a test news article", 1L); // Invalid: title is empty
 
         // When/Then
         mockMvc.perform(put("/api/v1/news/1")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidDto)))
+                .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest());
 
-        verify(newsService, times(0)).update(anyLong(), any(NewsRequestDto.class));
+        verify(newsService, times(0)).update(anyLong(), any(NewsModel.class));
     }
 
     @Test
@@ -265,8 +293,10 @@ class NewsControllerTest {
     @Test
     void getNewsByAuthor_withExistingAuthorId_shouldReturnListOfNewsListItemDto() throws Exception {
         // Given
-        List<NewsListItemDto> authorNewsList = Arrays.asList(newsListItemDto);
-        when(newsService.findByAuthor(1L)).thenReturn(authorNewsList);
+        List<NewsModel> newsModels = Arrays.asList(newsModel);
+        List<NewsListItem> newsListItems = Arrays.asList(newsListItem);
+        when(newsService.findByAuthor(1L)).thenReturn(newsModels);
+        when(newsApiMapper.toListItemList(newsModels)).thenReturn(newsListItems);
 
         // When/Then
         mockMvc.perform(get("/api/v1/news/author/1"))
@@ -297,8 +327,10 @@ class NewsControllerTest {
     @Test
     void searchNewsByTitle_shouldReturnListOfNewsListItemDto() throws Exception {
         // Given
-        List<NewsListItemDto> matchingNewsList = Arrays.asList(newsListItemDto);
-        when(newsService.findByTitle("Test")).thenReturn(matchingNewsList);
+        List<NewsModel> newsModels = Arrays.asList(newsModel);
+        List<NewsListItem> newsListItems = Arrays.asList(newsListItem);
+        when(newsService.findByTitle("Test")).thenReturn(newsModels);
+        when(newsApiMapper.toListItemList(newsModels)).thenReturn(newsListItems);
 
         // When/Then
         mockMvc.perform(get("/api/v1/news/search?title=Test"))

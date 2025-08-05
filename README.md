@@ -155,43 +155,62 @@ To add new migrations, create SQL files with the naming convention `V{number}__{
 
 ## API Architecture
 
+### Contract-First Design with OpenAPI
+
+The application follows a **contract-first** approach using OpenAPI specifications to drive API development:
+
+- **OpenAPI Specifications**: Located in `src/main/resources/openapi/`
+  - `news-api.yaml` - News operations and schemas
+  - `users-api.yaml` - User operations and schemas  
+  - `comments-api.yaml` - Comment operations and schemas
+
+- **Generated Code**: API interfaces and DTOs are automatically generated from OpenAPI specs
+  - `com.dev.news.newsportal.api` - Generated API interfaces
+  - `com.dev.news.newsportal.api.model` - Generated request/response DTOs
+
 ### Package Structure
 
 The application follows a layered architecture with clear separation of concerns:
 
-- `com.dev.news.newsportal.dto` - Data Transfer Objects
-  - `request` - Request DTOs for incoming data
-  - `response` - Response DTOs for outgoing data
-- `com.dev.news.newsportal.entity` - JPA entities
-- `com.dev.news.newsportal.mapper` - MapStruct mappers for entity-DTO conversion
-- `com.dev.news.newsportal.repository` - Spring Data JPA repositories
-- `com.dev.news.newsportal.service` - Service interfaces and implementations
-- `com.dev.news.newsportal.controller` - REST controllers
-- `com.dev.news.newsportal.exception` - Custom exceptions and exception handling
-- `com.dev.news.newsportal.config` - Configuration classes
+- **API Layer** (`com.dev.news.newsportal.controller`) - REST controllers implementing generated interfaces
+- **Domain Layer** (`com.dev.news.newsportal.model`) - Domain models for business logic
+- **Service Layer** (`com.dev.news.newsportal.service`) - Service interfaces and implementations
+- **Persistence Layer** (`com.dev.news.newsportal.entity`) - JPA entities
+- **Mapping Layer** (`com.dev.news.newsportal.mapper`) - MapStruct mappers
+  - `entity` - Entity ↔ Domain Model conversion
+  - `api` - Domain Model ↔ Generated DTO conversion
+- **Infrastructure** 
+  - `com.dev.news.newsportal.repository` - Spring Data JPA repositories
+  - `com.dev.news.newsportal.exception` - Custom exceptions and exception handling
+  - `com.dev.news.newsportal.config` - Configuration classes
 
-### DTO Implementation
+### Three-Layer Architecture
 
-The application uses Data Transfer Objects (DTOs) to separate the web layer from the persistence layer:
+The application implements a clean three-layer architecture:
 
-- **Request DTOs**: Used for incoming data validation and transfer
-  - `NewsRequestDto`, `UserRequestDto`, `CommentRequestDto`
-  - Include validation annotations for input validation
-  
-- **Response DTOs**: Used for returning data to clients
-  - `NewsResponseDto`, `UserResponseDto`, `CommentResponseDto`
-  - `NewsListItemDto`, `UserSummaryDto`, `CommentListItemDto`
-  - Tailored to specific use cases to avoid over-fetching
+1. **API Layer**: Controllers implement generated OpenAPI interfaces
+   - Handle HTTP requests/responses
+   - Convert between DTOs and domain models using API mappers
+   - Delegate business logic to service layer
 
-- **MapStruct Mappers**: Automate the conversion between entities and DTOs
-  - `NewsMapper`, `UserMapper`, `CommentMapper`
-  - Handle nested object mappings and custom transformations
+2. **Domain Layer**: Services work exclusively with domain models
+   - `NewsModel`, `UserModel`, `CommentModel` - Pure business objects
+   - Business logic and validation
+   - Transaction boundaries
 
-Benefits of this approach:
-- Clear separation between API contracts and database schema
-- Improved security by controlling what data is exposed
-- Better performance by fetching only required data
-- Simplified validation with Jakarta Validation annotations
+3. **Persistence Layer**: Repositories manage JPA entities
+   - Convert between entities and domain models using entity mappers
+   - Data access and persistence
+
+### Benefits of This Architecture
+
+- **Contract-First Development**: API specifications drive implementation
+- **Type Safety**: Generated DTOs with proper validation annotations
+- **Clear Separation**: API, domain, and persistence concerns are decoupled
+- **Maintainability**: Changes to API contracts are centralized in OpenAPI specs
+- **Documentation**: Self-documenting APIs through OpenAPI specifications
+- **Client Generation**: OpenAPI specs can generate client SDKs
+- **Testing**: API specifications enable contract testing
 
 ### API Documentation
 
@@ -265,7 +284,7 @@ Content-Type: application/json
 {
   "nickname": "johndoe",
   "email": "john.doe@example.com",
-  "role": "ROLE_USER"
+  "role": "USER"
 }
 ```
 
@@ -277,7 +296,7 @@ Content-Type: application/json
 {
   "nickname": "johndoe_updated",
   "email": "john.doe.updated@example.com",
-  "role": "ROLE_EDITOR"
+  "role": "ADMIN"
 }
 ```
 

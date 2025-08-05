@@ -1,9 +1,11 @@
 package com.dev.news.newsportal.controller;
 
-import com.dev.news.newsportal.dto.request.UserRequestDto;
-import com.dev.news.newsportal.dto.response.UserResponseDto;
+import com.dev.news.newsportal.api.model.users.UserRequest;
+import com.dev.news.newsportal.api.model.users.UserResponse;
 import com.dev.news.newsportal.exception.DuplicateResourceException;
 import com.dev.news.newsportal.exception.ResourceNotFoundException;
+import com.dev.news.newsportal.mapper.api.UserApiMapper;
+import com.dev.news.newsportal.model.UserModel;
 import com.dev.news.newsportal.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,30 +50,40 @@ class UserControllerTest {
     @MockBean
     private UserService userService;
 
-    private UserRequestDto userRequestDto;
-    private UserResponseDto userResponseDto;
+    @MockBean
+    private UserApiMapper userApiMapper;
+
+    private UserRequest userRequest;
+    private UserResponse userResponse;
+    private UserModel userModel;
 
     @BeforeEach
     void setUp() {
-        userRequestDto = UserRequestDto.builder()
-                .nickname("testuser")
-                .email("test@example.com")
-                .role("ROLE_USER")
-                .build();
-
-        userResponseDto = UserResponseDto.builder()
+        // Create domain model for service mocking
+        userModel = UserModel.builder()
                 .id(1L)
                 .nickname("testuser")
                 .email("test@example.com")
-                .role("ROLE_USER")
+                .role("USER")
                 .build();
+
+        // Create OpenAPI DTOs for request/response
+        userRequest = new UserRequest("testuser", "test@example.com", UserRequest.RoleEnum.USER);
+
+        userResponse = new UserResponse()
+                .id(1L)
+                .nickname("testuser")
+                .email("test@example.com")
+                .role("USER");
     }
 
     @Test
     void getAllUsers_shouldReturnListOfUserResponseDto() throws Exception {
         // Given
-        List<UserResponseDto> userList = Arrays.asList(userResponseDto);
-        when(userService.findAll()).thenReturn(userList);
+        List<UserModel> userModels = Arrays.asList(userModel);
+        List<UserResponse> userResponses = Arrays.asList(userResponse);
+        when(userService.findAll()).thenReturn(userModels);
+        when(userApiMapper.toResponseList(userModels)).thenReturn(userResponses);
 
         // When/Then
         mockMvc.perform(get("/api/v1/users"))
@@ -80,15 +92,17 @@ class UserControllerTest {
                 .andExpect(jsonPath("$[0].id", is(1)))
                 .andExpect(jsonPath("$[0].nickname", is("testuser")))
                 .andExpect(jsonPath("$[0].email", is("test@example.com")))
-                .andExpect(jsonPath("$[0].role", is("ROLE_USER")));
+                .andExpect(jsonPath("$[0].role", is("USER")));
 
         verify(userService).findAll();
+        verify(userApiMapper).toResponseList(userModels);
     }
 
     @Test
     void getUserById_withExistingId_shouldReturnUserResponseDto() throws Exception {
         // Given
-        when(userService.findById(1L)).thenReturn(userResponseDto);
+        when(userService.findById(1L)).thenReturn(userModel);
+        when(userApiMapper.toResponse(userModel)).thenReturn(userResponse);
 
         // When/Then
         mockMvc.perform(get("/api/v1/users/1"))
@@ -96,9 +110,10 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.nickname", is("testuser")))
                 .andExpect(jsonPath("$.email", is("test@example.com")))
-                .andExpect(jsonPath("$.role", is("ROLE_USER")));
+                .andExpect(jsonPath("$.role", is("USER")));
 
         verify(userService).findById(1L);
+        verify(userApiMapper).toResponse(userModel);
     }
 
     @Test
@@ -116,119 +131,125 @@ class UserControllerTest {
     @Test
     void createUser_withValidData_shouldReturnCreatedUserResponseDto() throws Exception {
         // Given
-        when(userService.create(any(UserRequestDto.class))).thenReturn(userResponseDto);
+        when(userApiMapper.toModel(any(UserRequest.class))).thenReturn(userModel);
+        when(userService.create(any(UserModel.class))).thenReturn(userModel);
+        when(userApiMapper.toResponse(userModel)).thenReturn(userResponse);
 
         // When/Then
         mockMvc.perform(post("/api/v1/users")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(userRequestDto)))
+                .content(objectMapper.writeValueAsString(userRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "http://localhost/api/v1/users/1"))
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.nickname", is("testuser")))
                 .andExpect(jsonPath("$.email", is("test@example.com")))
-                .andExpect(jsonPath("$.role", is("ROLE_USER")));
+                .andExpect(jsonPath("$.role", is("USER")));
 
-        verify(userService).create(any(UserRequestDto.class));
+        verify(userApiMapper).toModel(any(UserRequest.class));
+        verify(userService).create(any(UserModel.class));
+        verify(userApiMapper).toResponse(userModel);
     }
 
     @Test
     void createUser_withInvalidData_shouldReturnBadRequest() throws Exception {
         // Given
-        UserRequestDto invalidDto = UserRequestDto.builder()
-                .nickname("") // Invalid: nickname is required
-                .email("test@example.com")
-                .role("ROLE_USER")
-                .build();
+        UserRequest invalidRequest = new UserRequest("", "test@example.com", UserRequest.RoleEnum.USER); // Invalid: nickname is empty
 
         // When/Then
         mockMvc.perform(post("/api/v1/users")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidDto)))
+                .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest());
 
-        verify(userService, times(0)).create(any(UserRequestDto.class));
+        verify(userService, times(0)).create(any(UserModel.class));
     }
 
     @Test
     void createUser_withDuplicateNickname_shouldReturnConflict() throws Exception {
         // Given
-        when(userService.create(any(UserRequestDto.class)))
+        when(userApiMapper.toModel(any(UserRequest.class))).thenReturn(userModel);
+        when(userService.create(any(UserModel.class)))
                 .thenThrow(new DuplicateResourceException("User", "nickname", "testuser"));
 
         // When/Then
         mockMvc.perform(post("/api/v1/users")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(userRequestDto)))
+                .content(objectMapper.writeValueAsString(userRequest)))
                 .andExpect(status().isConflict());
 
-        verify(userService).create(any(UserRequestDto.class));
+        verify(userApiMapper).toModel(any(UserRequest.class));
+        verify(userService).create(any(UserModel.class));
     }
 
     @Test
     void updateUser_withExistingIdAndValidData_shouldReturnUpdatedUserResponseDto() throws Exception {
         // Given
-        when(userService.update(eq(1L), any(UserRequestDto.class))).thenReturn(userResponseDto);
+        when(userApiMapper.toModel(any(UserRequest.class))).thenReturn(userModel);
+        when(userService.update(eq(1L), any(UserModel.class))).thenReturn(userModel);
+        when(userApiMapper.toResponse(userModel)).thenReturn(userResponse);
 
         // When/Then
         mockMvc.perform(put("/api/v1/users/1")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(userRequestDto)))
+                .content(objectMapper.writeValueAsString(userRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.nickname", is("testuser")))
                 .andExpect(jsonPath("$.email", is("test@example.com")))
-                .andExpect(jsonPath("$.role", is("ROLE_USER")));
+                .andExpect(jsonPath("$.role", is("USER")));
 
-        verify(userService).update(eq(1L), any(UserRequestDto.class));
+        verify(userApiMapper).toModel(any(UserRequest.class));
+        verify(userService).update(eq(1L), any(UserModel.class));
+        verify(userApiMapper).toResponse(userModel);
     }
 
     @Test
     void updateUser_withNonExistingId_shouldReturnNotFound() throws Exception {
         // Given
-        when(userService.update(eq(999L), any(UserRequestDto.class)))
+        when(userApiMapper.toModel(any(UserRequest.class))).thenReturn(userModel);
+        when(userService.update(eq(999L), any(UserModel.class)))
                 .thenThrow(new ResourceNotFoundException("User", "id", 999L));
 
         // When/Then
         mockMvc.perform(put("/api/v1/users/999")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(userRequestDto)))
+                .content(objectMapper.writeValueAsString(userRequest)))
                 .andExpect(status().isNotFound());
 
-        verify(userService).update(eq(999L), any(UserRequestDto.class));
+        verify(userApiMapper).toModel(any(UserRequest.class));
+        verify(userService).update(eq(999L), any(UserModel.class));
     }
 
     @Test
     void updateUser_withInvalidData_shouldReturnBadRequest() throws Exception {
         // Given
-        UserRequestDto invalidDto = UserRequestDto.builder()
-                .nickname("") // Invalid: nickname is required
-                .email("test@example.com")
-                .role("ROLE_USER")
-                .build();
+        UserRequest invalidRequest = new UserRequest("", "test@example.com", UserRequest.RoleEnum.USER); // Invalid: nickname is empty
 
         // When/Then
         mockMvc.perform(put("/api/v1/users/1")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidDto)))
+                .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest());
 
-        verify(userService, times(0)).update(anyLong(), any(UserRequestDto.class));
+        verify(userService, times(0)).update(anyLong(), any(UserModel.class));
     }
 
     @Test
     void updateUser_withDuplicateNickname_shouldReturnConflict() throws Exception {
         // Given
-        when(userService.update(eq(1L), any(UserRequestDto.class)))
+        when(userApiMapper.toModel(any(UserRequest.class))).thenReturn(userModel);
+        when(userService.update(eq(1L), any(UserModel.class)))
                 .thenThrow(new DuplicateResourceException("User", "nickname", "testuser"));
 
         // When/Then
         mockMvc.perform(put("/api/v1/users/1")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(userRequestDto)))
+                .content(objectMapper.writeValueAsString(userRequest)))
                 .andExpect(status().isConflict());
 
-        verify(userService).update(eq(1L), any(UserRequestDto.class));
+        verify(userApiMapper).toModel(any(UserRequest.class));
+        verify(userService).update(eq(1L), any(UserModel.class));
     }
 
     @Test
@@ -259,7 +280,8 @@ class UserControllerTest {
     @Test
     void getUserByNickname_withExistingNickname_shouldReturnUserResponseDto() throws Exception {
         // Given
-        when(userService.findByNickname("testuser")).thenReturn(userResponseDto);
+        when(userService.findByNickname("testuser")).thenReturn(userModel);
+        when(userApiMapper.toResponse(userModel)).thenReturn(userResponse);
 
         // When/Then
         mockMvc.perform(get("/api/v1/users/nickname/testuser"))
@@ -267,9 +289,10 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.nickname", is("testuser")))
                 .andExpect(jsonPath("$.email", is("test@example.com")))
-                .andExpect(jsonPath("$.role", is("ROLE_USER")));
+                .andExpect(jsonPath("$.role", is("USER")));
 
         verify(userService).findByNickname("testuser");
+        verify(userApiMapper).toResponse(userModel);
     }
 
     @Test
@@ -288,7 +311,8 @@ class UserControllerTest {
     @Test
     void getUserByEmail_withExistingEmail_shouldReturnUserResponseDto() throws Exception {
         // Given
-        when(userService.findByEmail("test@example.com")).thenReturn(userResponseDto);
+        when(userService.findByEmail("test@example.com")).thenReturn(userModel);
+        when(userApiMapper.toResponse(userModel)).thenReturn(userResponse);
 
         // When/Then
         mockMvc.perform(get("/api/v1/users/email/test@example.com"))
@@ -296,9 +320,10 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.nickname", is("testuser")))
                 .andExpect(jsonPath("$.email", is("test@example.com")))
-                .andExpect(jsonPath("$.role", is("ROLE_USER")));
+                .andExpect(jsonPath("$.role", is("USER")));
 
         verify(userService).findByEmail("test@example.com");
+        verify(userApiMapper).toResponse(userModel);
     }
 
     @Test

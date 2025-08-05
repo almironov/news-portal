@@ -1,4 +1,4 @@
-package com.dev.news.newsportal.dto.response;
+package com.dev.news.newsportal.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,13 +13,15 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CommentResponseDto {
-    
+public class NewsModel {
+
     private Long id;
+    private String title;
     private String text;
+    private String imageUrl;
     private LocalDateTime creationDate;
-    private String authorNickname;
-    
+    private UserModel author;
+
     @Builder.Default
-    private List<CommentListItemDto> replies = new ArrayList<>();
+    private List<CommentModel> comments = new ArrayList<>();
 }

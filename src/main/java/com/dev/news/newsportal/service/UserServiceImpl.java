@@ -1,67 +1,78 @@
 package com.dev.news.newsportal.service;
 
-import com.dev.news.newsportal.dto.request.UserRequestDto;
-import com.dev.news.newsportal.dto.response.UserResponseDto;
 import com.dev.news.newsportal.entity.User;
 import com.dev.news.newsportal.exception.DuplicateResourceException;
 import com.dev.news.newsportal.exception.ResourceNotFoundException;
-import com.dev.news.newsportal.mapper.UserMapper;
+import com.dev.news.newsportal.mapper.entity.UserEntityMapper;
+import com.dev.news.newsportal.model.UserModel;
 import com.dev.news.newsportal.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional
 class UserServiceImpl implements UserService {
-    
+
     private final UserRepository userRepository;
-    private final UserMapper userMapper;
-    
-    UserServiceImpl(UserRepository userRepository, UserMapper userMapper) {
+    private final UserEntityMapper userEntityMapper;
+
+    UserServiceImpl(UserRepository userRepository, UserEntityMapper userEntityMapper) {
         this.userRepository = userRepository;
-        this.userMapper = userMapper;
+        this.userEntityMapper = userEntityMapper;
     }
-    
+
     @Override
     @Transactional(readOnly = true)
-    public UserResponseDto findById(Long id) {
+    public UserModel findById(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
-        return userMapper.toResponseDto(user);
+        return userEntityMapper.toModel(user);
     }
-    
+
     @Override
     @Transactional(readOnly = true)
-    public List<UserResponseDto> findAll() {
-        return userRepository.findAll().stream()
-                .map(userMapper::toResponseDto)
-                .collect(Collectors.toList());
+    public List<UserModel> findAll() {
+        List<User> users = userRepository.findAll();
+        return userEntityMapper.toModelList(users);
     }
-    
+
     @Override
-    public UserResponseDto create(UserRequestDto dto) {
-        validateUniqueFields(null, dto.getNickname(), dto.getEmail());
-        
-        User user = userMapper.toEntity(dto);
+    public UserModel create(UserModel userModel) {
+        validateUniqueFields(null, userModel.getNickname(), userModel.getEmail());
+
+        // Convert domain model to entity
+        User user = userEntityMapper.toEntity(userModel);
+        user.setId(null); // Ensure it's a new entity
+
+        // Save entity
         User savedUser = userRepository.save(user);
-        return userMapper.toResponseDto(savedUser);
+
+        // Convert back to domain model and return
+        return userEntityMapper.toModel(savedUser);
     }
-    
+
     @Override
-    public UserResponseDto update(Long id, UserRequestDto dto) {
-        User user = userRepository.findById(id)
+    public UserModel update(Long id, UserModel userModel) {
+        // Find existing user entity
+        User existingUser = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
-        
-        validateUniqueFields(id, dto.getNickname(), dto.getEmail());
-        
-        userMapper.updateEntityFromDto(dto, user);
-        User updatedUser = userRepository.save(user);
-        return userMapper.toResponseDto(updatedUser);
+
+        validateUniqueFields(id, userModel.getNickname(), userModel.getEmail());
+
+        // Update fields from domain model
+        existingUser.setNickname(userModel.getNickname());
+        existingUser.setEmail(userModel.getEmail());
+        existingUser.setRole(userModel.getRole());
+
+        // Save updated entity
+        User updatedUser = userRepository.save(existingUser);
+
+        // Convert back to domain model and return
+        return userEntityMapper.toModel(updatedUser);
     }
-    
+
     @Override
     public void delete(Long id) {
         if (!userRepository.existsById(id)) {
@@ -69,23 +80,23 @@ class UserServiceImpl implements UserService {
         }
         userRepository.deleteById(id);
     }
-    
+
     @Override
     @Transactional(readOnly = true)
-    public UserResponseDto findByNickname(String nickname) {
+    public UserModel findByNickname(String nickname) {
         User user = userRepository.findByNickname(nickname)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "nickname", nickname));
-        return userMapper.toResponseDto(user);
+        return userEntityMapper.toModel(user);
     }
-    
+
     @Override
     @Transactional(readOnly = true)
-    public UserResponseDto findByEmail(String email) {
+    public UserModel findByEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
-        return userMapper.toResponseDto(user);
+        return userEntityMapper.toModel(user);
     }
-    
+
     private void validateUniqueFields(Long id, String nickname, String email) {
         // Check if nickname is already taken by another user
         if (userRepository.existsByNickname(nickname)) {
@@ -95,7 +106,7 @@ class UserServiceImpl implements UserService {
                         throw new DuplicateResourceException("User", "nickname", nickname);
                     });
         }
-        
+
         // Check if email is already taken by another user
         if (userRepository.existsByEmail(email)) {
             userRepository.findByEmail(email)

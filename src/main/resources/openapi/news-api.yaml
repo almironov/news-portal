@@ -1,0 +1,410 @@
+openapi: 3.0.3
+info:
+  title: News API
+  description: API for managing news articles in the News Portal
+  version: 1.0.0
+  contact:
+    name: News Portal Team
+    email: support@newsportal.com
+
+servers:
+  - url: http://localhost:8080
+    description: Development server
+
+paths:
+  /api/v1/news:
+    get:
+      summary: Get all news articles
+      description: Retrieve a list of all news articles
+      operationId: getAllNews
+      tags:
+        - News
+      responses:
+        '200':
+          description: List of news articles retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NewsListItem'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    post:
+      summary: Create a new news article
+      description: Create a new news article
+      operationId: createNews
+      tags:
+        - News
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewsRequest'
+      responses:
+        '201':
+          description: News article created successfully
+          headers:
+            Location:
+              description: URL of the created news article
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Author not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/news/{id}:
+    get:
+      summary: Get news article by ID
+      description: Retrieve a specific news article by its ID
+      operationId: getNewsById
+      tags:
+        - News
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the news article to retrieve
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: News article retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsResponse'
+        '404':
+          description: News article not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    put:
+      summary: Update news article
+      description: Update an existing news article
+      operationId: updateNews
+      tags:
+        - News
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the news article to update
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewsRequest'
+      responses:
+        '200':
+          description: News article updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: News article or author not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    delete:
+      summary: Delete news article
+      description: Delete a news article by its ID
+      operationId: deleteNews
+      tags:
+        - News
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the news article to delete
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '204':
+          description: News article deleted successfully
+        '404':
+          description: News article not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/news/author/{authorId}:
+    get:
+      summary: Get news articles by author
+      description: Retrieve all news articles by a specific author
+      operationId: getNewsByAuthor
+      tags:
+        - News
+      parameters:
+        - name: authorId
+          in: path
+          required: true
+          description: ID of the author
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: News articles by author retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NewsListItem'
+        '404':
+          description: Author not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/news/search:
+    get:
+      summary: Search news articles by title
+      description: Search for news articles containing the specified title text
+      operationId: searchNewsByTitle
+      tags:
+        - News
+      parameters:
+        - name: title
+          in: query
+          required: true
+          description: Title text to search for
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+      responses:
+        '200':
+          description: Search results retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NewsListItem'
+        '400':
+          description: Invalid search parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    NewsRequest:
+      type: object
+      required:
+        - title
+        - text
+        - authorId
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Title of the news article
+          example: "Breaking News: Important Update"
+        text:
+          type: string
+          minLength: 1
+          description: Content of the news article
+          example: "This is the detailed content of the news article..."
+        imageUrl:
+          type: string
+          format: uri
+          description: URL of the news article image
+          example: "https://example.com/images/news-image.jpg"
+        authorId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: ID of the author
+          example: 1
+
+    NewsResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier of the news article
+          example: 1
+        title:
+          type: string
+          description: Title of the news article
+          example: "Breaking News: Important Update"
+        text:
+          type: string
+          description: Content of the news article
+          example: "This is the detailed content of the news article..."
+        imageUrl:
+          type: string
+          format: uri
+          description: URL of the news article image
+          example: "https://example.com/images/news-image.jpg"
+        creationDate:
+          type: string
+          format: date-time
+          description: Date and time when the news article was created
+          example: "2023-12-01T10:30:00Z"
+        author:
+          $ref: '#/components/schemas/UserSummary'
+        commentCount:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Number of comments on the news article
+          example: 5
+
+    NewsListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier of the news article
+          example: 1
+        title:
+          type: string
+          description: Title of the news article
+          example: "Breaking News: Important Update"
+        imageUrl:
+          type: string
+          format: uri
+          description: URL of the news article image
+          example: "https://example.com/images/news-image.jpg"
+        creationDate:
+          type: string
+          format: date-time
+          description: Date and time when the news article was created
+          example: "2023-12-01T10:30:00Z"
+        author:
+          $ref: '#/components/schemas/UserSummary'
+        commentCount:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Number of comments on the news article
+          example: 5
+
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier of the user
+          example: 1
+        nickname:
+          type: string
+          description: User's nickname
+          example: "john_doe"
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp when the error occurred
+          example: "2023-12-01T10:30:00Z"
+        status:
+          type: integer
+          description: HTTP status code
+          example: 400
+        error:
+          type: string
+          description: Error type
+          example: "Bad Request"
+        message:
+          type: string
+          description: Error message
+          example: "Title is required"
+        path:
+          type: string
+          description: Request path that caused the error
+          example: "/api/v1/news"
+
+tags:
+  - name: News
+    description: Operations related to news articles

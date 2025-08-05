@@ -1,12 +1,10 @@
 package com.dev.news.newsportal.service;
 
-import com.dev.news.newsportal.dto.request.CommentRequestDto;
-import com.dev.news.newsportal.dto.response.CommentListItemDto;
-import com.dev.news.newsportal.dto.response.CommentResponseDto;
 import com.dev.news.newsportal.entity.Comment;
 import com.dev.news.newsportal.entity.News;
 import com.dev.news.newsportal.exception.ResourceNotFoundException;
-import com.dev.news.newsportal.mapper.CommentMapper;
+import com.dev.news.newsportal.mapper.entity.CommentEntityMapper;
+import com.dev.news.newsportal.model.CommentModel;
 import com.dev.news.newsportal.repository.CommentRepository;
 import com.dev.news.newsportal.repository.NewsRepository;
 import org.springframework.stereotype.Service;
@@ -17,74 +15,84 @@ import java.util.List;
 @Service
 @Transactional
 class CommentServiceImpl implements CommentService {
-    
+
     private final CommentRepository commentRepository;
     private final NewsRepository newsRepository;
-    private final CommentMapper commentMapper;
-    
-    CommentServiceImpl(CommentRepository commentRepository, 
-                      NewsRepository newsRepository, 
-                      CommentMapper commentMapper) {
+    private final CommentEntityMapper commentEntityMapper;
+
+    CommentServiceImpl(CommentRepository commentRepository,
+                       NewsRepository newsRepository,
+                       CommentEntityMapper commentEntityMapper) {
         this.commentRepository = commentRepository;
         this.newsRepository = newsRepository;
-        this.commentMapper = commentMapper;
+        this.commentEntityMapper = commentEntityMapper;
     }
-    
+
     @Override
     @Transactional(readOnly = true)
-    public CommentResponseDto findById(Long id) {
+    public CommentModel findById(Long id) {
         Comment comment = commentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", id));
-        return commentMapper.toResponseDto(comment);
+        return commentEntityMapper.toModel(comment);
     }
-    
+
     @Override
     @Transactional(readOnly = true)
-    public List<CommentListItemDto> findByNews(Long newsId) {
+    public List<CommentModel> findByNews(Long newsId) {
         News news = newsRepository.findById(newsId)
                 .orElseThrow(() -> new ResourceNotFoundException("News", "id", newsId));
-        
-        return commentMapper.toListItemDtoList(commentRepository.findByNewsOrderByCreationDateDesc(news));
+
+        List<Comment> comments = commentRepository.findByNewsOrderByCreationDateDesc(news);
+        return commentEntityMapper.toModelList(comments);
     }
-    
+
     @Override
-    public CommentResponseDto create(CommentRequestDto dto) {
+    public CommentModel create(CommentModel commentModel) {
         // Verify that the news exists
-        News news = newsRepository.findById(dto.getNewsId())
-                .orElseThrow(() -> new ResourceNotFoundException("News", "id", dto.getNewsId()));
-        
+        News news = newsRepository.findById(commentModel.getNewsId())
+                .orElseThrow(() -> new ResourceNotFoundException("News", "id", commentModel.getNewsId()));
+
         // Verify that the parent comment exists if provided
         Comment parentComment = null;
-        if (dto.getParentCommentId() != null) {
-            parentComment = commentRepository.findById(dto.getParentCommentId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", dto.getParentCommentId()));
-            
+        if (commentModel.getParentCommentId() != null) {
+            parentComment = commentRepository.findById(commentModel.getParentCommentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", commentModel.getParentCommentId()));
+
             // Verify that the parent comment belongs to the same news
-            if (!parentComment.getNews().getId().equals(dto.getNewsId())) {
+            if (!parentComment.getNews().getId().equals(commentModel.getNewsId())) {
                 throw new IllegalArgumentException("Parent comment does not belong to the specified news");
             }
         }
-        
-        Comment comment = commentMapper.toEntity(dto);
+
+        // Convert domain model to entity
+        Comment comment = commentEntityMapper.toEntity(commentModel);
         comment.setNews(news);
         comment.setParentComment(parentComment);
-        
+        comment.setId(null); // Ensure it's a new entity
+
+        // Save entity
         Comment savedComment = commentRepository.save(comment);
-        return commentMapper.toResponseDto(savedComment);
+
+        // Convert back to domain model and return
+        return commentEntityMapper.toModel(savedComment);
     }
-    
+
     @Override
-    public CommentResponseDto update(Long id, CommentRequestDto dto) {
-        Comment comment = commentRepository.findById(id)
+    public CommentModel update(Long id, CommentModel commentModel) {
+        // Find existing comment entity
+        Comment existingComment = commentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", id));
-        
+
         // Only update the text, keep the other fields as they are
-        comment.setText(dto.getText());
-        
-        Comment updatedComment = commentRepository.save(comment);
-        return commentMapper.toResponseDto(updatedComment);
+        existingComment.setText(commentModel.getText());
+
+        // Save updated entity
+        Comment updatedComment = commentRepository.save(existingComment);
+
+        // Convert back to domain model and return
+        return commentEntityMapper.toModel(updatedComment);
     }
-    
+
     @Override
     public void delete(Long id) {
         if (!commentRepository.existsById(id)) {
@@ -92,13 +100,14 @@ class CommentServiceImpl implements CommentService {
         }
         commentRepository.deleteById(id);
     }
-    
+
     @Override
     @Transactional(readOnly = true)
-    public List<CommentListItemDto> findReplies(Long parentCommentId) {
+    public List<CommentModel> findReplies(Long parentCommentId) {
         Comment parentComment = commentRepository.findById(parentCommentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", parentCommentId));
-        
-        return commentMapper.toListItemDtoList(commentRepository.findByParentComment(parentComment));
+
+        List<Comment> replies = commentRepository.findByParentComment(parentComment);
+        return commentEntityMapper.toModelList(replies);
     }
 }

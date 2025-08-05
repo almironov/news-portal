@@ -1,9 +1,11 @@
 package com.dev.news.newsportal.controller;
 
-import com.dev.news.newsportal.dto.request.CommentRequestDto;
-import com.dev.news.newsportal.dto.response.CommentListItemDto;
-import com.dev.news.newsportal.dto.response.CommentResponseDto;
+import com.dev.news.newsportal.api.model.comments.CommentListItem;
+import com.dev.news.newsportal.api.model.comments.CommentRequest;
+import com.dev.news.newsportal.api.model.comments.CommentResponse;
 import com.dev.news.newsportal.exception.ResourceNotFoundException;
+import com.dev.news.newsportal.mapper.api.CommentApiMapper;
+import com.dev.news.newsportal.model.CommentModel;
 import com.dev.news.newsportal.service.CommentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,43 +51,54 @@ class CommentControllerTest {
     @MockBean
     private CommentService commentService;
 
-    private CommentRequestDto commentRequestDto;
-    private CommentResponseDto commentResponseDto;
-    private CommentListItemDto commentListItemDto;
+    @MockBean
+    private CommentApiMapper commentApiMapper;
+
+    private CommentRequest commentRequest;
+    private CommentResponse commentResponse;
+    private CommentListItem commentListItem;
+    private CommentModel commentModel;
     private LocalDateTime creationDate;
 
     @BeforeEach
     void setUp() {
         creationDate = LocalDateTime.now();
         
-        commentRequestDto = CommentRequestDto.builder()
-                .text("Test comment")
-                .authorNickname("testuser")
-                .newsId(1L)
-                .parentCommentId(null)
-                .build();
-
-        commentResponseDto = CommentResponseDto.builder()
+        // Create domain model for service mocking
+        commentModel = CommentModel.builder()
                 .id(1L)
                 .text("Test comment")
                 .authorNickname("testuser")
                 .creationDate(creationDate)
+                .newsId(1L)
+                .parentCommentId(null)
                 .replies(new ArrayList<>())
                 .build();
 
-        commentListItemDto = CommentListItemDto.builder()
+        // Create OpenAPI DTOs for request/response
+        commentRequest = new CommentRequest("Test comment", "testuser", 1L)
+                .parentCommentId(null);
+
+        commentResponse = new CommentResponse()
                 .id(1L)
                 .text("Test comment")
                 .authorNickname("testuser")
-                .creationDate(creationDate)
-                .hasReplies(false)
-                .build();
+                .creationDate(creationDate.atOffset(java.time.ZoneOffset.UTC))
+                .replies(new ArrayList<>());
+
+        commentListItem = new CommentListItem()
+                .id(1L)
+                .text("Test comment")
+                .authorNickname("testuser")
+                .creationDate(creationDate.atOffset(java.time.ZoneOffset.UTC))
+                .hasReplies(false);
     }
 
     @Test
     void getCommentById_withExistingId_shouldReturnCommentResponseDto() throws Exception {
         // Given
-        when(commentService.findById(1L)).thenReturn(commentResponseDto);
+        when(commentService.findById(1L)).thenReturn(commentModel);
+        when(commentApiMapper.toResponse(commentModel)).thenReturn(commentResponse);
 
         // When/Then
         mockMvc.perform(get("/api/v1/comments/1"))
@@ -96,6 +109,7 @@ class CommentControllerTest {
                 .andExpect(jsonPath("$.replies", hasSize(0)));
 
         verify(commentService).findById(1L);
+        verify(commentApiMapper).toResponse(commentModel);
     }
 
     @Test
@@ -113,8 +127,10 @@ class CommentControllerTest {
     @Test
     void getCommentsByNews_withExistingNewsId_shouldReturnListOfCommentListItemDto() throws Exception {
         // Given
-        List<CommentListItemDto> commentList = Arrays.asList(commentListItemDto);
-        when(commentService.findByNews(1L)).thenReturn(commentList);
+        List<CommentModel> commentModels = Arrays.asList(commentModel);
+        List<CommentListItem> commentListItems = Arrays.asList(commentListItem);
+        when(commentService.findByNews(1L)).thenReturn(commentModels);
+        when(commentApiMapper.toListItemList(commentModels)).thenReturn(commentListItems);
 
         // When/Then
         mockMvc.perform(get("/api/v1/comments/news/1"))
@@ -126,6 +142,7 @@ class CommentControllerTest {
                 .andExpect(jsonPath("$[0].hasReplies", is(false)));
 
         verify(commentService).findByNews(1L);
+        verify(commentApiMapper).toListItemList(commentModels);
     }
 
     @Test
@@ -143,12 +160,14 @@ class CommentControllerTest {
     @Test
     void createComment_withValidData_shouldReturnCreatedCommentResponseDto() throws Exception {
         // Given
-        when(commentService.create(any(CommentRequestDto.class))).thenReturn(commentResponseDto);
+        when(commentApiMapper.toModel(any(CommentRequest.class))).thenReturn(commentModel);
+        when(commentService.create(any(CommentModel.class))).thenReturn(commentModel);
+        when(commentApiMapper.toResponse(commentModel)).thenReturn(commentResponse);
 
         // When/Then
         mockMvc.perform(post("/api/v1/comments")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(commentRequestDto)))
+                .content(objectMapper.writeValueAsString(commentRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "http://localhost/api/v1/comments/1"))
                 .andExpect(jsonPath("$.id", is(1)))
@@ -156,119 +175,115 @@ class CommentControllerTest {
                 .andExpect(jsonPath("$.authorNickname", is("testuser")))
                 .andExpect(jsonPath("$.replies", hasSize(0)));
 
-        verify(commentService).create(any(CommentRequestDto.class));
+        verify(commentApiMapper).toModel(any(CommentRequest.class));
+        verify(commentService).create(any(CommentModel.class));
+        verify(commentApiMapper).toResponse(commentModel);
     }
 
     @Test
     void createComment_withInvalidData_shouldReturnBadRequest() throws Exception {
         // Given
-        CommentRequestDto invalidDto = CommentRequestDto.builder()
-                .text("") // Invalid: text is required
-                .authorNickname("testuser")
-                .newsId(1L)
-                .build();
+        CommentRequest invalidRequest = new CommentRequest("", "testuser", 1L); // Invalid: text is empty
 
         // When/Then
         mockMvc.perform(post("/api/v1/comments")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidDto)))
+                .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest());
 
-        verify(commentService, times(0)).create(any(CommentRequestDto.class));
+        verify(commentService, times(0)).create(any(CommentModel.class));
     }
 
     @Test
     void createComment_withNonExistingNewsId_shouldReturnNotFound() throws Exception {
         // Given
-        when(commentService.create(any(CommentRequestDto.class)))
+        when(commentApiMapper.toModel(any(CommentRequest.class))).thenReturn(commentModel);
+        when(commentService.create(any(CommentModel.class)))
                 .thenThrow(new ResourceNotFoundException("News", "id", 999L));
 
-        CommentRequestDto dtoWithNonExistingNewsId = CommentRequestDto.builder()
-                .text("Test comment")
-                .authorNickname("testuser")
-                .newsId(999L) // Non-existing news ID
-                .build();
+        CommentRequest requestWithNonExistingNewsId = new CommentRequest("Test comment", "testuser", 999L);
 
         // When/Then
         mockMvc.perform(post("/api/v1/comments")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(dtoWithNonExistingNewsId)))
+                .content(objectMapper.writeValueAsString(requestWithNonExistingNewsId)))
                 .andExpect(status().isNotFound());
 
-        verify(commentService).create(any(CommentRequestDto.class));
+        verify(commentApiMapper).toModel(any(CommentRequest.class));
+        verify(commentService).create(any(CommentModel.class));
     }
 
     @Test
     void createComment_withNonExistingParentCommentId_shouldReturnNotFound() throws Exception {
         // Given
-        when(commentService.create(any(CommentRequestDto.class)))
+        when(commentApiMapper.toModel(any(CommentRequest.class))).thenReturn(commentModel);
+        when(commentService.create(any(CommentModel.class)))
                 .thenThrow(new ResourceNotFoundException("Comment", "id", 999L));
 
-        CommentRequestDto dtoWithNonExistingParentId = CommentRequestDto.builder()
-                .text("Test comment")
-                .authorNickname("testuser")
-                .newsId(1L)
-                .parentCommentId(999L) // Non-existing parent comment ID
-                .build();
+        CommentRequest requestWithNonExistingParentId = new CommentRequest("Test comment", "testuser", 1L)
+                .parentCommentId(999L);
 
         // When/Then
         mockMvc.perform(post("/api/v1/comments")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(dtoWithNonExistingParentId)))
+                .content(objectMapper.writeValueAsString(requestWithNonExistingParentId)))
                 .andExpect(status().isNotFound());
 
-        verify(commentService).create(any(CommentRequestDto.class));
+        verify(commentApiMapper).toModel(any(CommentRequest.class));
+        verify(commentService).create(any(CommentModel.class));
     }
 
     @Test
     void updateComment_withExistingIdAndValidData_shouldReturnUpdatedCommentResponseDto() throws Exception {
         // Given
-        when(commentService.update(eq(1L), any(CommentRequestDto.class))).thenReturn(commentResponseDto);
+        when(commentApiMapper.toModel(any(CommentRequest.class))).thenReturn(commentModel);
+        when(commentService.update(eq(1L), any(CommentModel.class))).thenReturn(commentModel);
+        when(commentApiMapper.toResponse(commentModel)).thenReturn(commentResponse);
 
         // When/Then
         mockMvc.perform(put("/api/v1/comments/1")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(commentRequestDto)))
+                .content(objectMapper.writeValueAsString(commentRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.text", is("Test comment")))
                 .andExpect(jsonPath("$.authorNickname", is("testuser")))
                 .andExpect(jsonPath("$.replies", hasSize(0)));
 
-        verify(commentService).update(eq(1L), any(CommentRequestDto.class));
+        verify(commentApiMapper).toModel(any(CommentRequest.class));
+        verify(commentService).update(eq(1L), any(CommentModel.class));
+        verify(commentApiMapper).toResponse(commentModel);
     }
 
     @Test
     void updateComment_withNonExistingId_shouldReturnNotFound() throws Exception {
         // Given
-        when(commentService.update(eq(999L), any(CommentRequestDto.class)))
+        when(commentApiMapper.toModel(any(CommentRequest.class))).thenReturn(commentModel);
+        when(commentService.update(eq(999L), any(CommentModel.class)))
                 .thenThrow(new ResourceNotFoundException("Comment", "id", 999L));
 
         // When/Then
         mockMvc.perform(put("/api/v1/comments/999")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(commentRequestDto)))
+                .content(objectMapper.writeValueAsString(commentRequest)))
                 .andExpect(status().isNotFound());
 
-        verify(commentService).update(eq(999L), any(CommentRequestDto.class));
+        verify(commentApiMapper).toModel(any(CommentRequest.class));
+        verify(commentService).update(eq(999L), any(CommentModel.class));
     }
 
     @Test
     void updateComment_withInvalidData_shouldReturnBadRequest() throws Exception {
         // Given
-        CommentRequestDto invalidDto = CommentRequestDto.builder()
-                .text("") // Invalid: text is required
-                .authorNickname("testuser")
-                .newsId(1L)
-                .build();
+        CommentRequest invalidRequest = new CommentRequest("", "testuser", 1L); // Invalid: text is empty
 
         // When/Then
         mockMvc.perform(put("/api/v1/comments/1")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidDto)))
+                .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest());
 
-        verify(commentService, times(0)).update(anyLong(), any(CommentRequestDto.class));
+        verify(commentService, times(0)).update(anyLong(), any(CommentModel.class));
     }
 
     @Test
@@ -297,10 +312,12 @@ class CommentControllerTest {
     }
 
     @Test
-    void getCommentReplies_withExistingId_shouldReturnListOfCommentListItemDto() throws Exception {
+    void getCommentReplies_withExistingCommentId_shouldReturnListOfCommentListItemDto() throws Exception {
         // Given
-        List<CommentListItemDto> replyList = Arrays.asList(commentListItemDto);
-        when(commentService.findReplies(1L)).thenReturn(replyList);
+        List<CommentModel> replyModels = Arrays.asList(commentModel);
+        List<CommentListItem> replyListItems = Arrays.asList(commentListItem);
+        when(commentService.findReplies(1L)).thenReturn(replyModels);
+        when(commentApiMapper.toListItemList(replyModels)).thenReturn(replyListItems);
 
         // When/Then
         mockMvc.perform(get("/api/v1/comments/1/replies"))
@@ -312,10 +329,11 @@ class CommentControllerTest {
                 .andExpect(jsonPath("$[0].hasReplies", is(false)));
 
         verify(commentService).findReplies(1L);
+        verify(commentApiMapper).toListItemList(replyModels);
     }
 
     @Test
-    void getCommentReplies_withNonExistingId_shouldReturnNotFound() throws Exception {
+    void getCommentReplies_withNonExistingCommentId_shouldReturnNotFound() throws Exception {
         // Given
         when(commentService.findReplies(999L)).thenThrow(new ResourceNotFoundException("Comment", "id", 999L));
 
@@ -324,5 +342,20 @@ class CommentControllerTest {
                 .andExpect(status().isNotFound());
 
         verify(commentService).findReplies(999L);
+    }
+
+    @Test
+    void getCommentReplies_withNoReplies_shouldReturnEmptyList() throws Exception {
+        // Given
+        when(commentService.findReplies(1L)).thenReturn(Arrays.asList());
+        when(commentApiMapper.toListItemList(Arrays.asList())).thenReturn(Arrays.asList());
+
+        // When/Then
+        mockMvc.perform(get("/api/v1/comments/1/replies"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+
+        verify(commentService).findReplies(1L);
+        verify(commentApiMapper).toListItemList(Arrays.asList());
     }
 }

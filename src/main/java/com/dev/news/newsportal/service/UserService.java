@@ -1,23 +1,22 @@
 package com.dev.news.newsportal.service;
 
-import com.dev.news.newsportal.dto.request.UserRequestDto;
-import com.dev.news.newsportal.dto.response.UserResponseDto;
+import com.dev.news.newsportal.model.UserModel;
 
 import java.util.List;
 
 public interface UserService {
-    
-    UserResponseDto findById(Long id);
-    
-    List<UserResponseDto> findAll();
-    
-    UserResponseDto create(UserRequestDto dto);
-    
-    UserResponseDto update(Long id, UserRequestDto dto);
-    
+
+    UserModel findById(Long id);
+
+    List<UserModel> findAll();
+
+    UserModel create(UserModel userModel);
+
+    UserModel update(Long id, UserModel userModel);
+
     void delete(Long id);
-    
-    UserResponseDto findByNickname(String nickname);
-    
-    UserResponseDto findByEmail(String email);
+
+    UserModel findByNickname(String nickname);
+
+    UserModel findByEmail(String email);
 }

@@ -1,13 +1,12 @@
 package com.dev.news.newsportal.service;
 
-import com.dev.news.newsportal.dto.request.NewsRequestDto;
-import com.dev.news.newsportal.dto.response.NewsListItemDto;
-import com.dev.news.newsportal.dto.response.NewsResponseDto;
-import com.dev.news.newsportal.dto.response.UserSummaryDto;
 import com.dev.news.newsportal.entity.News;
 import com.dev.news.newsportal.entity.User;
 import com.dev.news.newsportal.exception.ResourceNotFoundException;
-import com.dev.news.newsportal.mapper.NewsMapper;
+import com.dev.news.newsportal.mapper.entity.NewsEntityMapper;
+import com.dev.news.newsportal.mapper.entity.UserEntityMapper;
+import com.dev.news.newsportal.model.NewsModel;
+import com.dev.news.newsportal.model.UserModel;
 import com.dev.news.newsportal.repository.NewsRepository;
 import com.dev.news.newsportal.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,13 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class NewsServiceTest {
@@ -45,83 +38,81 @@ class NewsServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private NewsMapper newsMapper;
+    private NewsEntityMapper newsEntityMapper;
+
+    @Mock
+    private UserEntityMapper userEntityMapper;
 
     @InjectMocks
     private NewsServiceImpl newsService;
 
-    private User author;
-    private News news;
-    private NewsRequestDto newsRequestDto;
-    private NewsResponseDto newsResponseDto;
-    private NewsListItemDto newsListItemDto;
-    private UserSummaryDto authorSummaryDto;
+    private User authorEntity;
+    private News newsEntity;
+    private UserModel authorModel;
+    private NewsModel newsModel;
+    private LocalDateTime creationDate;
 
     @BeforeEach
     void setUp() {
-        // Set up test data
-        author = User.builder()
+        creationDate = LocalDateTime.now();
+        
+        // Set up entity data
+        authorEntity = User.builder()
                 .id(1L)
                 .nickname("testuser")
                 .email("test@example.com")
-                .role("ROLE_USER")
+                .role("USER")
                 .build();
 
-        news = News.builder()
+        newsEntity = News.builder()
                 .id(1L)
                 .title("Test News")
                 .text("This is a test news article")
                 .imageUrl("https://example.com/image.jpg")
-                .creationDate(LocalDateTime.now())
-                .author(author)
+                .creationDate(creationDate)
+                .author(authorEntity)
                 .comments(new ArrayList<>())
                 .build();
 
-        authorSummaryDto = UserSummaryDto.builder()
+        // Set up domain model data
+        authorModel = UserModel.builder()
                 .id(1L)
                 .nickname("testuser")
+                .email("test@example.com")
+                .role("USER")
                 .build();
 
-        newsRequestDto = NewsRequestDto.builder()
-                .title("Test News")
-                .text("This is a test news article")
-                .imageUrl("https://example.com/image.jpg")
-                .authorId(1L)
-                .build();
-
-        newsResponseDto = NewsResponseDto.builder()
+        newsModel = NewsModel.builder()
                 .id(1L)
                 .title("Test News")
                 .text("This is a test news article")
                 .imageUrl("https://example.com/image.jpg")
-                .creationDate(news.getCreationDate())
-                .author(authorSummaryDto)
-                .commentCount(0)
-                .build();
-
-        newsListItemDto = NewsListItemDto.builder()
-                .id(1L)
-                .title("Test News")
-                .imageUrl("https://example.com/image.jpg")
-                .creationDate(news.getCreationDate())
-                .author(authorSummaryDto)
-                .commentCount(0)
+                .creationDate(creationDate)
+                .author(authorModel)
+                .comments(new ArrayList<>())
                 .build();
     }
 
     @Test
-    void findById_withExistingId_shouldReturnNewsResponseDto() {
+    void findById_withExistingId_shouldReturnNewsModel() {
         // Given
-        when(newsRepository.findById(1L)).thenReturn(Optional.of(news));
-        when(newsMapper.toResponseDto(news)).thenReturn(newsResponseDto);
+        when(newsRepository.findById(1L)).thenReturn(Optional.of(newsEntity));
+        when(newsEntityMapper.toModel(newsEntity)).thenReturn(newsModel);
 
         // When
-        NewsResponseDto result = newsService.findById(1L);
+        NewsModel result = newsService.findById(1L);
 
         // Then
-        assertThat(result).isEqualTo(newsResponseDto);
+        assertThat(result).isNotNull();
+        assertThat(result.getId()).isEqualTo(1L);
+        assertThat(result.getTitle()).isEqualTo("Test News");
+        assertThat(result.getText()).isEqualTo("This is a test news article");
+        assertThat(result.getImageUrl()).isEqualTo("https://example.com/image.jpg");
+        assertThat(result.getAuthor().getId()).isEqualTo(1L);
+        assertThat(result.getAuthor().getNickname()).isEqualTo("testuser");
+
         verify(newsRepository).findById(1L);
-        verify(newsMapper).toResponseDto(news);
+        verify(newsEntityMapper).toModel(newsEntity);
     }
 
     @Test
@@ -132,236 +123,175 @@ class NewsServiceTest {
         // When/Then
         assertThatThrownBy(() -> newsService.findById(999L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("News not found with id: 999");
+                .hasMessage("News not found with id: 999");
 
         verify(newsRepository).findById(999L);
-        verify(newsMapper, never()).toResponseDto(any());
+        verify(newsEntityMapper, never()).toModel(any(News.class));
     }
 
     @Test
-    void findAll_shouldReturnListOfNewsListItemDto() {
+    void findAll_shouldReturnListOfNewsModels() {
         // Given
-        News news2 = News.builder()
-                .id(2L)
-                .title("Another News")
-                .author(author)
-                .build();
-
-        NewsListItemDto newsListItemDto2 = NewsListItemDto.builder()
-                .id(2L)
-                .title("Another News")
-                .author(authorSummaryDto)
-                .build();
-
-        List<News> newsList = Arrays.asList(news, news2);
-        List<NewsListItemDto> newsListItemDtos = Arrays.asList(newsListItemDto, newsListItemDto2);
-        
-        when(newsRepository.findAll()).thenReturn(newsList);
-        when(newsMapper.toListItemDtoList(newsList)).thenReturn(newsListItemDtos);
+        List<News> newsEntities = Arrays.asList(newsEntity);
+        List<NewsModel> newsModels = Arrays.asList(newsModel);
+        when(newsRepository.findAll()).thenReturn(newsEntities);
+        when(newsEntityMapper.toModelList(newsEntities)).thenReturn(newsModels);
 
         // When
-        List<NewsListItemDto> result = newsService.findAll();
+        List<NewsModel> result = newsService.findAll();
 
         // Then
-        assertThat(result).isEqualTo(newsListItemDtos);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(1L);
+        assertThat(result.get(0).getTitle()).isEqualTo("Test News");
+
         verify(newsRepository).findAll();
-        verify(newsMapper).toListItemDtoList(newsList);
+        verify(newsEntityMapper).toModelList(newsEntities);
     }
 
     @Test
-    void create_withValidData_shouldReturnCreatedNewsResponseDto() {
+    void create_withValidNewsModel_shouldReturnCreatedNewsModel() {
         // Given
-        when(userRepository.findById(1L)).thenReturn(Optional.of(author));
-        when(newsMapper.toEntity(newsRequestDto)).thenReturn(news);
-        when(newsRepository.save(news)).thenReturn(news);
-        when(newsMapper.toResponseDto(news)).thenReturn(newsResponseDto);
+        NewsModel inputModel = NewsModel.builder()
+                .title("New News")
+                .text("New news content")
+                .imageUrl("https://example.com/new-image.jpg")
+                .author(authorModel)
+                .build();
+
+        News inputEntity = News.builder()
+                .title("New News")
+                .text("New news content")
+                .imageUrl("https://example.com/new-image.jpg")
+                .author(authorEntity)
+                .build();
+
+        News savedEntity = News.builder()
+                .id(2L)
+                .title("New News")
+                .text("New news content")
+                .imageUrl("https://example.com/new-image.jpg")
+                .creationDate(creationDate)
+                .author(authorEntity)
+                .comments(new ArrayList<>())
+                .build();
+
+        NewsModel savedModel = NewsModel.builder()
+                .id(2L)
+                .title("New News")
+                .text("New news content")
+                .imageUrl("https://example.com/new-image.jpg")
+                .creationDate(creationDate)
+                .author(authorModel)
+                .comments(new ArrayList<>())
+                .build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(authorEntity));
+        when(newsEntityMapper.toEntity(inputModel)).thenReturn(inputEntity);
+        when(newsRepository.save(any(News.class))).thenReturn(savedEntity);
+        when(newsEntityMapper.toModel(savedEntity)).thenReturn(savedModel);
 
         // When
-        NewsResponseDto result = newsService.create(newsRequestDto);
+        NewsModel result = newsService.create(inputModel);
 
         // Then
-        assertThat(result).isEqualTo(newsResponseDto);
+        assertThat(result).isNotNull();
+        assertThat(result.getId()).isEqualTo(2L);
+        assertThat(result.getTitle()).isEqualTo("New News");
+        assertThat(result.getText()).isEqualTo("New news content");
+
         verify(userRepository).findById(1L);
-        verify(newsMapper).toEntity(newsRequestDto);
-        verify(newsRepository).save(news);
-        verify(newsMapper).toResponseDto(news);
+        verify(newsEntityMapper).toEntity(inputModel);
+        verify(newsRepository).save(any(News.class));
+        verify(newsEntityMapper).toModel(savedEntity);
     }
 
     @Test
     void create_withNonExistingAuthor_shouldThrowResourceNotFoundException() {
         // Given
-        when(userRepository.findById(999L)).thenReturn(Optional.empty());
-        
-        NewsRequestDto invalidDto = NewsRequestDto.builder()
-                .title("Test News")
-                .text("This is a test news article")
-                .authorId(999L)
+        NewsModel inputModel = NewsModel.builder()
+                .title("New News")
+                .text("New news content")
+                .author(UserModel.builder().id(999L).build())
                 .build();
+
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
         // When/Then
-        assertThatThrownBy(() -> newsService.create(invalidDto))
+        assertThatThrownBy(() -> newsService.create(inputModel))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("User not found with id: 999");
+                .hasMessage("User not found with id: 999");
 
         verify(userRepository).findById(999L);
-        verify(newsMapper, never()).toEntity(any());
-        verify(newsRepository, never()).save(any());
+        verify(newsRepository, never()).save(any(News.class));
     }
 
     @Test
-    void update_withExistingIdAndSameAuthor_shouldReturnUpdatedNewsResponseDto() {
+    void update_withExistingIdAndValidData_shouldReturnUpdatedNewsModel() {
         // Given
-        News existingNews = News.builder()
+        NewsModel updateModel = NewsModel.builder()
+                .title("Updated News")
+                .text("Updated news content")
+                .imageUrl("https://example.com/updated-image.jpg")
+                .author(authorModel)
+                .build();
+
+        News updatedEntity = News.builder()
                 .id(1L)
-                .title("Old Title")
-                .text("Old text")
-                .imageUrl("https://example.com/old.jpg")
-                .author(author)
+                .title("Updated News")
+                .text("Updated news content")
+                .imageUrl("https://example.com/updated-image.jpg")
+                .creationDate(creationDate)
+                .author(authorEntity)
+                .comments(new ArrayList<>())
                 .build();
 
-        NewsRequestDto updateDto = NewsRequestDto.builder()
-                .title("Updated Title")
-                .text("Updated text")
-                .imageUrl("https://example.com/updated.jpg")
-                .authorId(1L) // Same author ID
-                .build();
-
-        News updatedNews = News.builder()
+        NewsModel updatedModel = NewsModel.builder()
                 .id(1L)
-                .title("Updated Title")
-                .text("Updated text")
-                .imageUrl("https://example.com/updated.jpg")
-                .author(author)
+                .title("Updated News")
+                .text("Updated news content")
+                .imageUrl("https://example.com/updated-image.jpg")
+                .creationDate(creationDate)
+                .author(authorModel)
+                .comments(new ArrayList<>())
                 .build();
 
-        NewsResponseDto updatedResponseDto = NewsResponseDto.builder()
-                .id(1L)
-                .title("Updated Title")
-                .text("Updated text")
-                .imageUrl("https://example.com/updated.jpg")
-                .author(authorSummaryDto)
-                .build();
-
-        when(newsRepository.findById(1L)).thenReturn(Optional.of(existingNews));
-        doNothing().when(newsMapper).updateEntityFromDto(updateDto, existingNews);
-        when(newsRepository.save(existingNews)).thenReturn(updatedNews);
-        when(newsMapper.toResponseDto(updatedNews)).thenReturn(updatedResponseDto);
+        when(newsRepository.findById(1L)).thenReturn(Optional.of(newsEntity));
+        when(newsRepository.save(any(News.class))).thenReturn(updatedEntity);
+        when(newsEntityMapper.toModel(updatedEntity)).thenReturn(updatedModel);
 
         // When
-        NewsResponseDto result = newsService.update(1L, updateDto);
+        NewsModel result = newsService.update(1L, updateModel);
 
         // Then
-        assertThat(result).isEqualTo(updatedResponseDto);
+        assertThat(result).isNotNull();
+        assertThat(result.getId()).isEqualTo(1L);
+        assertThat(result.getTitle()).isEqualTo("Updated News");
+        assertThat(result.getText()).isEqualTo("Updated news content");
+
         verify(newsRepository).findById(1L);
-        verify(newsMapper).updateEntityFromDto(updateDto, existingNews);
-        verify(userRepository, never()).findById(anyLong()); // Author ID is the same, so no need to find the author
-        verify(newsRepository).save(existingNews);
-        verify(newsMapper).toResponseDto(updatedNews);
-    }
-
-    @Test
-    void update_withExistingIdAndDifferentAuthor_shouldReturnUpdatedNewsResponseDto() {
-        // Given
-        User newAuthor = User.builder()
-                .id(2L)
-                .nickname("newauthor")
-                .build();
-
-        UserSummaryDto newAuthorSummaryDto = UserSummaryDto.builder()
-                .id(2L)
-                .nickname("newauthor")
-                .build();
-
-        News existingNews = News.builder()
-                .id(1L)
-                .title("Old Title")
-                .text("Old text")
-                .author(author)
-                .build();
-
-        NewsRequestDto updateDto = NewsRequestDto.builder()
-                .title("Updated Title")
-                .text("Updated text")
-                .authorId(2L) // Different author ID
-                .build();
-
-        News updatedNews = News.builder()
-                .id(1L)
-                .title("Updated Title")
-                .text("Updated text")
-                .author(newAuthor)
-                .build();
-
-        NewsResponseDto updatedResponseDto = NewsResponseDto.builder()
-                .id(1L)
-                .title("Updated Title")
-                .text("Updated text")
-                .author(newAuthorSummaryDto)
-                .build();
-
-        when(newsRepository.findById(1L)).thenReturn(Optional.of(existingNews));
-        doNothing().when(newsMapper).updateEntityFromDto(updateDto, existingNews);
-        when(userRepository.findById(2L)).thenReturn(Optional.of(newAuthor));
-        when(newsRepository.save(existingNews)).thenReturn(updatedNews);
-        when(newsMapper.toResponseDto(updatedNews)).thenReturn(updatedResponseDto);
-
-        // When
-        NewsResponseDto result = newsService.update(1L, updateDto);
-
-        // Then
-        assertThat(result).isEqualTo(updatedResponseDto);
-        verify(newsRepository).findById(1L);
-        verify(newsMapper).updateEntityFromDto(updateDto, existingNews);
-        verify(userRepository).findById(2L); // Different author ID, so need to find the new author
-        verify(newsRepository).save(existingNews);
-        verify(newsMapper).toResponseDto(updatedNews);
+        verify(newsRepository).save(any(News.class));
+        verify(newsEntityMapper).toModel(updatedEntity);
     }
 
     @Test
     void update_withNonExistingId_shouldThrowResourceNotFoundException() {
         // Given
+        NewsModel updateModel = NewsModel.builder()
+                .title("Updated News")
+                .text("Updated news content")
+                .author(authorModel)
+                .build();
+
         when(newsRepository.findById(999L)).thenReturn(Optional.empty());
 
         // When/Then
-        assertThatThrownBy(() -> newsService.update(999L, newsRequestDto))
+        assertThatThrownBy(() -> newsService.update(999L, updateModel))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("News not found with id: 999");
+                .hasMessage("News not found with id: 999");
 
         verify(newsRepository).findById(999L);
-        verify(newsMapper, never()).updateEntityFromDto(any(), any());
-        verify(userRepository, never()).findById(anyLong());
-        verify(newsRepository, never()).save(any());
-    }
-
-    @Test
-    void update_withNonExistingAuthor_shouldThrowResourceNotFoundException() {
-        // Given
-        News existingNews = News.builder()
-                .id(1L)
-                .title("Old Title")
-                .text("Old text")
-                .author(author)
-                .build();
-
-        NewsRequestDto updateDto = NewsRequestDto.builder()
-                .title("Updated Title")
-                .text("Updated text")
-                .authorId(999L) // Non-existing author ID
-                .build();
-
-        when(newsRepository.findById(1L)).thenReturn(Optional.of(existingNews));
-        doNothing().when(newsMapper).updateEntityFromDto(updateDto, existingNews);
-        when(userRepository.findById(999L)).thenReturn(Optional.empty());
-
-        // When/Then
-        assertThatThrownBy(() -> newsService.update(1L, updateDto))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("User not found with id: 999");
-
-        verify(newsRepository).findById(1L);
-        verify(newsMapper).updateEntityFromDto(updateDto, existingNews);
-        verify(userRepository).findById(999L);
-        verify(newsRepository, never()).save(any());
+        verify(newsRepository, never()).save(any(News.class));
     }
 
     @Test
@@ -385,30 +315,32 @@ class NewsServiceTest {
         // When/Then
         assertThatThrownBy(() -> newsService.delete(999L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("News not found with id: 999");
+                .hasMessage("News not found with id: 999");
 
         verify(newsRepository).existsById(999L);
         verify(newsRepository, never()).deleteById(anyLong());
     }
 
     @Test
-    void findByAuthor_withExistingAuthorId_shouldReturnListOfNewsListItemDto() {
+    void findByAuthor_withExistingAuthorId_shouldReturnListOfNewsModels() {
         // Given
-        List<News> authorNews = Arrays.asList(news);
-        List<NewsListItemDto> authorNewsListItemDtos = Arrays.asList(newsListItemDto);
-        
-        when(userRepository.findById(1L)).thenReturn(Optional.of(author));
-        when(newsRepository.findByAuthor(author)).thenReturn(authorNews);
-        when(newsMapper.toListItemDtoList(authorNews)).thenReturn(authorNewsListItemDtos);
+        List<News> newsEntities = Arrays.asList(newsEntity);
+        List<NewsModel> newsModels = Arrays.asList(newsModel);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(authorEntity));
+        when(newsRepository.findByAuthor(authorEntity)).thenReturn(newsEntities);
+        when(newsEntityMapper.toModelList(newsEntities)).thenReturn(newsModels);
 
         // When
-        List<NewsListItemDto> result = newsService.findByAuthor(1L);
+        List<NewsModel> result = newsService.findByAuthor(1L);
 
         // Then
-        assertThat(result).isEqualTo(authorNewsListItemDtos);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(1L);
+        assertThat(result.get(0).getAuthor().getId()).isEqualTo(1L);
+
         verify(userRepository).findById(1L);
-        verify(newsRepository).findByAuthor(author);
-        verify(newsMapper).toListItemDtoList(authorNews);
+        verify(newsRepository).findByAuthor(authorEntity);
+        verify(newsEntityMapper).toModelList(newsEntities);
     }
 
     @Test
@@ -419,28 +351,44 @@ class NewsServiceTest {
         // When/Then
         assertThatThrownBy(() -> newsService.findByAuthor(999L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("User not found with id: 999");
+                .hasMessage("User not found with id: 999");
 
         verify(userRepository).findById(999L);
-        verify(newsRepository, never()).findByAuthor(any());
-        verify(newsMapper, never()).toListItemDtoList(any());
+        verify(newsRepository, never()).findByAuthor(any(User.class));
     }
 
     @Test
-    void findByTitle_shouldReturnListOfNewsListItemDto() {
+    void findByTitle_shouldReturnListOfNewsModels() {
         // Given
-        List<News> matchingNews = Arrays.asList(news);
-        List<NewsListItemDto> matchingNewsListItemDtos = Arrays.asList(newsListItemDto);
-        
-        when(newsRepository.findByTitleContainingIgnoreCase("Test")).thenReturn(matchingNews);
-        when(newsMapper.toListItemDtoList(matchingNews)).thenReturn(matchingNewsListItemDtos);
+        List<News> newsEntities = Arrays.asList(newsEntity);
+        List<NewsModel> newsModels = Arrays.asList(newsModel);
+        when(newsRepository.findByTitleContainingIgnoreCase("Test")).thenReturn(newsEntities);
+        when(newsEntityMapper.toModelList(newsEntities)).thenReturn(newsModels);
 
         // When
-        List<NewsListItemDto> result = newsService.findByTitle("Test");
+        List<NewsModel> result = newsService.findByTitle("Test");
 
         // Then
-        assertThat(result).isEqualTo(matchingNewsListItemDtos);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getTitle()).contains("Test");
+
         verify(newsRepository).findByTitleContainingIgnoreCase("Test");
-        verify(newsMapper).toListItemDtoList(matchingNews);
+        verify(newsEntityMapper).toModelList(newsEntities);
+    }
+
+    @Test
+    void findByTitle_withNoMatches_shouldReturnEmptyList() {
+        // Given
+        when(newsRepository.findByTitleContainingIgnoreCase("NonExistent")).thenReturn(Arrays.asList());
+        when(newsEntityMapper.toModelList(Arrays.asList())).thenReturn(Arrays.asList());
+
+        // When
+        List<NewsModel> result = newsService.findByTitle("NonExistent");
+
+        // Then
+        assertThat(result).isEmpty();
+
+        verify(newsRepository).findByTitleContainingIgnoreCase("NonExistent");
+        verify(newsEntityMapper).toModelList(Arrays.asList());
     }
 }
