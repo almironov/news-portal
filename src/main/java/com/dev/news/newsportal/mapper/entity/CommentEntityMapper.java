@@ -5,6 +5,7 @@ import com.dev.news.newsportal.entity.News;
 import com.dev.news.newsportal.model.CommentModel;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 
 import java.util.List;
 
@@ -22,6 +23,14 @@ public interface CommentEntityMapper {
     List<CommentModel> toModelList(List<Comment> entities);
 
     List<Comment> toEntityList(List<CommentModel> models);
+
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "creationDate", ignore = true)
+    @Mapping(target = "news", ignore = true)
+    @Mapping(target = "parentComment", ignore = true)
+    @Mapping(target = "authorNickname", ignore = true)
+    @Mapping(target = "replies", ignore = true)
+    void updateEntity(@MappingTarget Comment target, CommentModel source);
 
     default News createNewsReference(Long newsId) {
         if (newsId == null) {

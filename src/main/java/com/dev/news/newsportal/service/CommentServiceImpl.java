@@ -83,8 +83,8 @@ class CommentServiceImpl implements CommentService {
         Comment existingComment = commentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", id));
 
-        // Only update the text, keep the other fields as they are
-        existingComment.setText(commentModel.getText());
+        // Use CommentEntityMapper to update properties, preserving id, creationDate, news, parentComment, authorNickname
+        commentEntityMapper.updateEntity(existingComment, commentModel);
 
         // Save updated entity
         Comment updatedComment = commentRepository.save(existingComment);

@@ -4,6 +4,7 @@ import com.dev.news.newsportal.entity.User;
 import com.dev.news.newsportal.model.UserModel;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 
 import java.util.List;
 
@@ -18,4 +19,8 @@ public interface UserEntityMapper {
     List<UserModel> toModelList(List<User> entities);
 
     List<User> toEntityList(List<UserModel> models);
+
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "news", ignore = true)
+    void updateEntity(@MappingTarget User target, UserModel source);
 }

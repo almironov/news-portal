@@ -61,10 +61,8 @@ class UserServiceImpl implements UserService {
 
         validateUniqueFields(id, userModel.getNickname(), userModel.getEmail());
 
-        // Update fields from domain model
-        existingUser.setNickname(userModel.getNickname());
-        existingUser.setEmail(userModel.getEmail());
-        existingUser.setRole(userModel.getRole());
+        // Use UserEntityMapper to update properties, preserving id and news
+        userEntityMapper.updateEntity(existingUser, userModel);
 
         // Save updated entity
         User updatedUser = userRepository.save(existingUser);

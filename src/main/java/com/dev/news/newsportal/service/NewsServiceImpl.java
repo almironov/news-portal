@@ -69,10 +69,8 @@ class NewsServiceImpl implements NewsService {
         News existingNews = newsRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("News", "id", id));
 
-        // Update fields from domain model
-        existingNews.setTitle(newsModel.getTitle());
-        existingNews.setText(newsModel.getText());
-        existingNews.setImageUrl(newsModel.getImageUrl());
+        // Use NewsEntityMapper to update properties, preserving id, creationDate, comments
+        newsEntityMapper.updateEntity(existingNews, newsModel);
 
         // Update author if changed
         if (newsModel.getAuthor() != null &&
