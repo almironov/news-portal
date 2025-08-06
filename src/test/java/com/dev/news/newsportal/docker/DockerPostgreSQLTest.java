@@ -2,6 +2,7 @@ package com.dev.news.newsportal.docker;
 
 import com.dev.news.newsportal.entity.User;
 import com.dev.news.newsportal.repository.UserRepository;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

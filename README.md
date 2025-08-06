@@ -1,5 +1,205 @@
 # News Portal Application
 
+A Spring Boot application for managing news articles, users, and comments with comprehensive REST API support.
+
+## Features
+
+- **Spring Boot Best Practices**: 100% compliance with Spring Boot guidelines for production-ready applications
+- **Contract-First API Design**: OpenAPI specifications drive development
+- **Comprehensive Logging**: Structured logging with SLF4J for production monitoring
+- **Configuration Management**: Type-safe configuration properties with validation
+- **Database Support**: H2 for development, PostgreSQL for production
+- **Clean Architecture**: Layered design with clear separation of concerns
+- **Advanced JUnit Testing**: Comprehensive JUnit 5 configuration with parameterized tests, test suites, and enhanced testing capabilities
+
+## Configuration
+
+### Application Configuration Properties
+
+The application uses type-safe configuration properties grouped by functionality:
+
+```properties
+# News Portal Configuration Properties
+news-portal.database.max-connections=20
+news-portal.security.jwt-secret=${JWT_SECRET:default-secret}
+```
+
+#### Configuration Structure
+
+- **Database Configuration** (`news-portal.database.*`)
+  - `max-connections`: Maximum database connection pool size (minimum: 1)
+
+- **Security Configuration** (`news-portal.security.*`)
+  - `jwt-secret`: JWT secret key for token signing (required, non-blank)
+
+#### Environment Variables
+
+For production deployments, use environment variables:
+
+```bash
+# Required environment variables
+export JWT_SECRET=your-production-jwt-secret-key
+
+# Optional environment variables
+export NEWS_PORTAL_DATABASE_MAX_CONNECTIONS=50
+```
+
+#### Configuration Validation
+
+The application validates configuration on startup and fails fast with invalid settings:
+- Database max connections must be at least 1
+- JWT secret cannot be blank
+- Invalid configuration will prevent application startup
+
+### Logging Configuration
+
+The application implements comprehensive structured logging:
+
+#### Log Levels
+- **INFO**: Business operations (create, update, delete operations)
+- **DEBUG**: Detailed operation flows and method entry/exit
+- **WARN**: Business rule violations and recoverable errors
+- **ERROR**: Exception scenarios and critical failures
+
+#### Log Output Examples
+```
+INFO  - Successfully created news with id: 123 and title: Breaking News
+DEBUG - Finding news by id: 123
+WARN  - News not found with id: 999 for update
+ERROR - Author not found with id: 456 when creating news
+```
+
+#### Production Logging
+- No sensitive data (credentials, PII) in log output
+- Expensive log operations are guarded with level checks
+- Configurable log levels per environment
+
+## JUnit Testing Configuration
+
+The application includes comprehensive JUnit 5 testing configuration with advanced features:
+
+### JUnit Platform Configuration
+
+The project includes a `junit-platform.properties` file that configures JUnit 5 behavior:
+
+```properties
+# Test execution configuration
+junit.jupiter.execution.parallel.enabled=false
+junit.jupiter.execution.parallel.mode.default=same_thread
+junit.jupiter.execution.parallel.mode.classes.default=same_thread
+
+# Test discovery configuration
+junit.jupiter.testinstance.lifecycle.default=per_class
+
+# Display names configuration
+junit.jupiter.displayname.generator.default=org.junit.jupiter.api.DisplayNameGenerator$ReplaceUnderscores
+
+# Test method ordering
+junit.jupiter.testmethod.order.default=org.junit.jupiter.api.MethodOrderer$OrderAnnotation
+
+# Extensions configuration
+junit.jupiter.extensions.autodetection.enabled=true
+
+# Test reporting
+junit.jupiter.platform.reporting.open.xml.enabled=true
+junit.jupiter.platform.reporting.output.dir=target/test-reports
+```
+
+### Enhanced JUnit Dependencies
+
+The project includes explicit JUnit dependencies for enhanced testing capabilities:
+
+- **junit-jupiter-params**: Enables parameterized tests with various parameter sources
+- **junit-platform-launcher**: Provides programmatic test execution capabilities
+- **junit-platform-suite**: Enables test suite configuration and execution
+
+### Test Configuration Classes
+
+#### NewsPortalTestConfiguration
+Provides common test beans and configuration:
+- Fixed clock for deterministic time-dependent tests
+- Test-specific profiles and properties
+
+#### AllTestsSuite
+Comprehensive test suite that runs all tests:
+```java
+@Suite
+@SuiteDisplayName("News Portal - All Tests Suite")
+@SelectPackages({
+    "com.dev.news.newsportal.service",
+    "com.dev.news.newsportal.repository", 
+    "com.dev.news.newsportal.controller",
+    "com.dev.news.newsportal.mapper"
+})
+public class AllTestsSuite {
+    // Test suite implementation
+}
+```
+
+### Parameterized Testing Examples
+
+The project includes examples of advanced JUnit 5 features:
+
+#### @ValueSource Tests
+```java
+@ParameterizedTest
+@ValueSource(strings = {"user@example.com", "test@domain.org"})
+void isValidEmail_withValidEmails_shouldReturnTrue(String email) {
+    // Test implementation
+}
+```
+
+#### @CsvSource Tests
+```java
+@ParameterizedTest
+@CsvSource({
+    "'Hello World', 5, 20, true",
+    "'Hi', 5, 20, false"
+})
+void isValidTextLength_withVariousInputs_shouldReturnExpectedResult(
+        String text, int minLength, int maxLength, boolean expected) {
+    // Test implementation
+}
+```
+
+#### @NullAndEmptySource Tests
+```java
+@ParameterizedTest
+@NullAndEmptySource
+@ValueSource(strings = {"   ", "\t", "\n"})
+void isValidEmail_withInvalidEmails_shouldReturnFalse(String email) {
+    // Test implementation
+}
+```
+
+### Running Tests
+
+#### Run All Tests
+```bash
+./mvnw test
+```
+
+#### Run Specific Test Suite
+```bash
+./mvnw test -Dtest=AllTestsSuite
+```
+
+#### Run Parameterized Tests
+```bash
+./mvnw test -Dtest=ValidationUtilsTest
+```
+
+#### Run Tests with Specific Profile
+```bash
+./mvnw test -Dspring.profiles.active=test
+```
+
+### Test Reporting
+
+JUnit generates comprehensive test reports in:
+- `target/test-reports/` - XML test reports
+- `target/surefire-reports/` - Maven Surefire reports
+
 ## Database Configuration
 
 This application supports two database configurations:

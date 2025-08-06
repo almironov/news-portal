@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
@@ -35,7 +36,6 @@ class UserServiceTest {
     @Mock
     private UserEntityMapper userEntityMapper;
 
-    @InjectMocks
     private UserServiceImpl userService;
 
     private User userEntity;
@@ -43,6 +43,12 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Reset all mocks to ensure test isolation
+        MockitoAnnotations.openMocks(this);
+        
+        // Manually instantiate service with mocked dependencies
+        userService = new UserServiceImpl(userRepository, userEntityMapper);
+        
         // Set up entity data
         userEntity = User.builder()
                 .id(1L)

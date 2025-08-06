@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
@@ -40,7 +41,6 @@ class CommentServiceTest {
     @Mock
     private CommentEntityMapper commentEntityMapper;
 
-    @InjectMocks
     private CommentServiceImpl commentService;
 
     private News newsEntity;
@@ -52,6 +52,12 @@ class CommentServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Reset all mocks to ensure test isolation
+        MockitoAnnotations.openMocks(this);
+        
+        // Manually instantiate service with mocked dependencies
+        commentService = new CommentServiceImpl(commentRepository, newsRepository, commentEntityMapper);
+        
         creationDate = LocalDateTime.now();
         
         // Set up entity data
