@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Before running this test, make sure to start the Docker container using:
  * docker-compose up -d
  */
+@Disabled("This test requires a running PostgreSQL container")
 @SpringBootTest
 @ActiveProfiles("pgsql")
 public class DockerPostgreSQLTest {
