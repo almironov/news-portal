@@ -2,6 +2,125 @@
 
 A Spring Boot application for managing news articles, users, and comments with comprehensive REST API support.
 
+## Quick Start Guide
+
+This guide will help you quickly set up and run the News Portal application along with the event consumer service.
+
+### Prerequisites
+
+- Java 17 or higher
+- Maven 3.6+
+- Docker and Docker Compose
+- Git
+
+### Step 1: Start Infrastructure Services
+
+First, start the required infrastructure services (PostgreSQL databases and RabbitMQ) using Docker Compose:
+
+```bash
+# Clone this repository (specific branch with RabbitMQ integration)
+git clone -b feature/2-rabbitmq https://github.com/almironov/news-portal.git
+cd news-portal
+
+# Start infrastructure services
+docker compose up -d
+
+# Verify services are running
+docker compose ps
+```
+
+This will start:
+- **PostgreSQL** (port 5432) - Main database for news-portal
+- **PostgreSQL Consumer** (port 5433) - Database for event consumer
+- **RabbitMQ** (port 5672) - Message broker
+- **RabbitMQ Management UI** (port 15672) - Web interface (admin/admin123)
+
+### Step 2: Run the News Portal Service
+
+With the infrastructure running, start the main News Portal application with the PostgreSQL profile:
+
+```bash
+# Build and run the application with PostgreSQL profile (required)
+./mvnw spring-boot:run -Dspring-boot.run.profiles=pgsql
+```
+
+The application will be available at:
+- **API**: http://localhost:8080
+- **Swagger UI**: http://localhost:8080/swagger-ui.html
+
+### Step 3: Run the Event Consumer Service
+
+After the News Portal service is running, set up and run the event consumer service:
+
+```bash
+# Clone the event consumer repository
+git clone https://github.com/almironov/news-portal-event-consumer.git
+cd news-portal-event-consumer
+
+# Build the consumer application
+./mvnw clean package
+
+# Run the consumer application
+./mvnw spring-boot:run
+```
+
+The event consumer service will:
+- Connect to the same RabbitMQ instance
+- Process events published by the News Portal service
+- Store processed events in the separate PostgreSQL database (port 5433)
+
+### Step 4: Verify the Setup
+
+1. **Check News Portal API**:
+   ```bash
+   curl http://localhost:8080/api/v1/news
+   ```
+
+2. **Use Postman Collection for API Testing**:
+   - Import the provided Postman collection: `News Portal API.postman_collection.json`
+   - The collection includes pre-configured requests for all API endpoints
+   - Test CRUD operations for news, users, and comments
+   - Verify API responses and data validation
+
+3. **Check RabbitMQ Management UI**:
+   - Open http://localhost:15672
+   - Login with admin/admin123
+   - Verify queues are created and consumers are connected
+
+4. **Test Event Processing**:
+   - Create a news article via the API (using curl or Postman)
+   - Check RabbitMQ queues for message processing
+   - Verify events are stored in the consumer database
+
+### Environment Variables
+
+For production or custom configurations, you can override default settings:
+
+```bash
+# RabbitMQ Configuration
+export RABBITMQ_HOST=localhost
+export RABBITMQ_PORT=5672
+export RABBITMQ_USERNAME=admin
+export RABBITMQ_PASSWORD=admin123
+
+# Database Configuration
+export SPRING_PROFILES_ACTIVE=pgsql
+```
+
+### Stopping Services
+
+To stop all services:
+
+```bash
+# Stop the applications (Ctrl+C in their respective terminals)
+
+# Stop infrastructure services
+docker compose down
+
+# Stop and remove volumes (this will delete all data)
+docker compose down -v
+```
+
 ## Features
 
 - **Spring Boot Best Practices**: 100% compliance with Spring Boot guidelines for production-ready applications
