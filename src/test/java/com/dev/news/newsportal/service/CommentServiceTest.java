@@ -14,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -41,6 +42,9 @@ class CommentServiceTest {
     @Mock
     private CommentEntityMapper commentEntityMapper;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private CommentServiceImpl commentService;
 
     private News newsEntity;
@@ -56,7 +60,7 @@ class CommentServiceTest {
         MockitoAnnotations.openMocks(this);
         
         // Manually instantiate service with mocked dependencies
-        commentService = new CommentServiceImpl(commentRepository, newsRepository, commentEntityMapper);
+        commentService = new CommentServiceImpl(commentRepository, newsRepository, commentEntityMapper, eventPublisher);
         
         creationDate = LocalDateTime.now();
         

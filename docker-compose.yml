@@ -12,11 +12,59 @@ services:
       POSTGRES_PASSWORD: postgres
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    networks:
+      - news-portal-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d newsdb"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  postgres-consumer:
+    image: postgres:14-alpine
+    container_name: news-portal-consumer-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: news_events_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres-consumer-data:/var/lib/postgresql/data
+    networks:
+      - news-portal-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d news_events_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: news-portal-rabbitmq
+    ports:
+      - "5672:5672"    # AMQP port
+      - "15672:15672"  # Management UI port
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-admin123}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - news-portal-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+networks:
+  news-portal-network:
+    driver: bridge
+
 volumes:
   postgres-data:
+  postgres-consumer-data:
+  rabbitmq-data:

@@ -16,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -51,6 +52,9 @@ class NewsServiceTest {
     @Mock
     private UserEntityMapper userEntityMapper;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private NewsServiceImpl newsService;
 
     private User authorEntity;
@@ -65,7 +69,7 @@ class NewsServiceTest {
         MockitoAnnotations.openMocks(this);
         
         // Manually instantiate service with mocked dependencies
-        newsService = new NewsServiceImpl(newsRepository, userRepository, newsEntityMapper, userEntityMapper);
+        newsService = new NewsServiceImpl(newsRepository, userRepository, newsEntityMapper, userEntityMapper, eventPublisher);
         
         creationDate = LocalDateTime.now();
         

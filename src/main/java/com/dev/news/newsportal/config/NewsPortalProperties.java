@@ -25,6 +25,10 @@ public class NewsPortalProperties {
     @Valid
     private Security security = new Security();
 
+    @NestedConfigurationProperty
+    @Valid
+    private RabbitMq rabbitMq = new RabbitMq();
+
     /**
      * Database-related configuration properties.
      */
@@ -49,5 +53,89 @@ public class NewsPortalProperties {
          */
         @NotBlank
         private String jwtSecret;
+    }
+
+    /**
+     * RabbitMQ-related configuration properties.
+     * Simplified configuration for message publishing only.
+     */
+    @Data
+    public static class RabbitMq {
+        @NestedConfigurationProperty
+        @Valid
+        private Exchanges exchanges = new Exchanges();
+
+        @Data
+        public static class Exchanges {
+            @NestedConfigurationProperty
+            @Valid
+            private NewsExchange news = new NewsExchange();
+
+            @NestedConfigurationProperty
+            @Valid
+            private CommentsExchange comments = new CommentsExchange();
+
+            @Data
+            public static class NewsExchange {
+                @NotBlank
+                private String exchange = "exchange.news";
+
+                @NestedConfigurationProperty
+                @Valid
+                private Binding binding = new Binding();
+
+                @Data
+                public static class Binding {
+                    @NestedConfigurationProperty
+                    @Valid
+                    private Created created = new Created();
+
+                    @NestedConfigurationProperty
+                    @Valid
+                    private Updated updated = new Updated();
+
+                    @Data
+                    public static class Created {
+                        @NotBlank
+                        private String queue = "queue.news.created";
+                        @NotBlank
+                        private String key = "news.created";
+                    }
+
+                    @Data
+                    public static class Updated {
+                        @NotBlank
+                        private String queue = "queue.news.updated";
+                        @NotBlank
+                        private String key = "news.updated";
+                    }
+                }
+            }
+
+            @Data
+            public static class CommentsExchange {
+                @NotBlank
+                private String exchange = "exchange.comments";
+
+                @NestedConfigurationProperty
+                @Valid
+                private Binding binding = new Binding();
+
+                @Data
+                public static class Binding {
+                    @NestedConfigurationProperty
+                    @Valid
+                    private Created created = new Created();
+
+                    @Data
+                    public static class Created {
+                        @NotBlank
+                        private String queue = "queue.comments.created";
+                        @NotBlank
+                        private String key = "comments.created";
+                    }
+                }
+            }
+        }
     }
 }

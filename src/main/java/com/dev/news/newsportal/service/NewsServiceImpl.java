@@ -2,6 +2,8 @@ package com.dev.news.newsportal.service;
 
 import com.dev.news.newsportal.entity.News;
 import com.dev.news.newsportal.entity.User;
+import com.dev.news.newsportal.event.NewsCreatedApplicationEvent;
+import com.dev.news.newsportal.event.NewsUpdatedApplicationEvent;
 import com.dev.news.newsportal.exception.ResourceNotFoundException;
 import com.dev.news.newsportal.mapper.entity.NewsEntityMapper;
 import com.dev.news.newsportal.mapper.entity.UserEntityMapper;
@@ -9,6 +11,7 @@ import com.dev.news.newsportal.model.NewsModel;
 import com.dev.news.newsportal.repository.NewsRepository;
 import com.dev.news.newsportal.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -25,13 +28,16 @@ class NewsServiceImpl implements NewsService {
     private final UserRepository userRepository;
     private final NewsEntityMapper newsEntityMapper;
     private final UserEntityMapper userEntityMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     NewsServiceImpl(NewsRepository newsRepository, UserRepository userRepository,
-                    NewsEntityMapper newsEntityMapper, UserEntityMapper userEntityMapper) {
+                    NewsEntityMapper newsEntityMapper, UserEntityMapper userEntityMapper,
+                    ApplicationEventPublisher eventPublisher) {
         this.newsRepository = newsRepository;
         this.userRepository = userRepository;
         this.newsEntityMapper = newsEntityMapper;
         this.userEntityMapper = userEntityMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -86,6 +92,9 @@ class NewsServiceImpl implements NewsService {
         News savedNews = newsRepository.save(news);
         log.info("Successfully created news with id: {} and title: {}", savedNews.getId(), savedNews.getTitle());
 
+        // Publish application event
+        eventPublisher.publishEvent(new NewsCreatedApplicationEvent(this, savedNews));
+
         // Convert back to domain model and return
         return newsEntityMapper.toModel(savedNews);
     }
@@ -120,6 +129,9 @@ class NewsServiceImpl implements NewsService {
         // Save updated entity
         News updatedNews = newsRepository.save(existingNews);
         log.info("Successfully updated news with id: {} and title: {}", updatedNews.getId(), updatedNews.getTitle());
+
+        // Publish application event
+        eventPublisher.publishEvent(new NewsUpdatedApplicationEvent(this, updatedNews));
 
         // Convert back to domain model and return
         return newsEntityMapper.toModel(updatedNews);

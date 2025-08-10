@@ -33,11 +33,18 @@ public class News {
     @Column(nullable = false)
     private LocalDateTime creationDate;
 
+    private LocalDateTime updateDate;
+
     @PrePersist
     public void prePersist() {
         if (creationDate == null) {
             creationDate = LocalDateTime.now();
         }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updateDate = LocalDateTime.now();
     }
 
     @ManyToOne(fetch = FetchType.LAZY)

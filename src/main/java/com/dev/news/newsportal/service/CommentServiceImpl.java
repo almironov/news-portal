@@ -2,12 +2,14 @@ package com.dev.news.newsportal.service;
 
 import com.dev.news.newsportal.entity.Comment;
 import com.dev.news.newsportal.entity.News;
+import com.dev.news.newsportal.event.CommentCreatedApplicationEvent;
 import com.dev.news.newsportal.exception.ResourceNotFoundException;
 import com.dev.news.newsportal.mapper.entity.CommentEntityMapper;
 import com.dev.news.newsportal.model.CommentModel;
 import com.dev.news.newsportal.repository.CommentRepository;
 import com.dev.news.newsportal.repository.NewsRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,13 +23,16 @@ class CommentServiceImpl implements CommentService {
     private final CommentRepository commentRepository;
     private final NewsRepository newsRepository;
     private final CommentEntityMapper commentEntityMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     CommentServiceImpl(CommentRepository commentRepository,
                        NewsRepository newsRepository,
-                       CommentEntityMapper commentEntityMapper) {
+                       CommentEntityMapper commentEntityMapper,
+                       ApplicationEventPublisher eventPublisher) {
         this.commentRepository = commentRepository;
         this.newsRepository = newsRepository;
         this.commentEntityMapper = commentEntityMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -97,6 +102,9 @@ class CommentServiceImpl implements CommentService {
         // Save entity
         Comment savedComment = commentRepository.save(comment);
         log.info("Successfully created comment with id: {} for news id: {}", savedComment.getId(), commentModel.getNewsId());
+
+        // Publish application event
+        eventPublisher.publishEvent(new CommentCreatedApplicationEvent(this, savedComment));
 
         // Convert back to domain model and return
         return commentEntityMapper.toModel(savedComment);
