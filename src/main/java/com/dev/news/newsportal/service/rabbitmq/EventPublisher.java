@@ -1,4 +1,4 @@
-package com.dev.news.newsportal.service;
+package com.dev.news.newsportal.service.rabbitmq;
 
 import com.dev.news.newsportal.config.NewsPortalProperties;
 import com.dev.news.newsportal.event.CommentCreatedEvent;
@@ -7,7 +7,6 @@ import com.dev.news.newsportal.event.NewsUpdatedEvent;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;

@@ -1,4 +1,4 @@
-package com.dev.news.newsportal.service;
+package com.dev.news.newsportal.service.rabbitmq;
 
 import com.dev.news.newsportal.event.CommentCreatedApplicationEvent;
 import com.dev.news.newsportal.event.CommentCreatedEvent;

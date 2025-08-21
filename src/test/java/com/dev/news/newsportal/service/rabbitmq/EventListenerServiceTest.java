@@ -1,4 +1,4 @@
-package com.dev.news.newsportal.service;
+package com.dev.news.newsportal.service.rabbitmq;
 
 import com.dev.news.newsportal.entity.Comment;
 import com.dev.news.newsportal.entity.News;
@@ -47,10 +47,10 @@ class EventListenerServiceTest {
     @BeforeEach
     void setUp() {
         eventListenerService = new EventListenerService(eventPublisher, newsEventMapper, commentEventMapper);
-        
+
         creationDate = LocalDateTime.of(2024, 1, 15, 10, 30, 0);
         updateDate = LocalDateTime.of(2024, 1, 15, 14, 45, 0);
-        
+
         // Set up entity data
         author = User.builder()
                 .id(1L)
@@ -162,7 +162,7 @@ class EventListenerServiceTest {
         // Given
         NewsCreatedApplicationEvent applicationEvent = new NewsCreatedApplicationEvent(this, news);
         RuntimeException mapperException = new RuntimeException("Mapper failed");
-        
+
         when(newsEventMapper.toNewsCreatedEvent(news)).thenThrow(mapperException);
 
         // When
@@ -171,7 +171,7 @@ class EventListenerServiceTest {
         // Then
         verify(newsEventMapper).toNewsCreatedEvent(news);
         verify(eventPublisher, never()).publishNewsCreatedEvent(any());
-        
+
         // The method should not re-throw the exception (it's logged but swallowed)
         // This is expected behavior for @TransactionalEventListener to avoid affecting the main transaction
     }
@@ -195,7 +195,7 @@ class EventListenerServiceTest {
         // Then
         verify(newsEventMapper).toNewsCreatedEvent(news);
         verify(eventPublisher).publishNewsCreatedEvent(newsCreatedEvent);
-        
+
         // The method should not re-throw the exception (it's logged but swallowed)
         // This is expected behavior for @TransactionalEventListener to avoid affecting the main transaction
     }
@@ -205,7 +205,7 @@ class EventListenerServiceTest {
         // Given
         NewsUpdatedApplicationEvent applicationEvent = new NewsUpdatedApplicationEvent(this, news);
         RuntimeException mapperException = new RuntimeException("Mapper failed");
-        
+
         when(newsEventMapper.toNewsUpdatedEvent(news)).thenThrow(mapperException);
 
         // When
@@ -242,7 +242,7 @@ class EventListenerServiceTest {
         // Given
         CommentCreatedApplicationEvent applicationEvent = new CommentCreatedApplicationEvent(this, comment);
         RuntimeException mapperException = new RuntimeException("Mapper failed");
-        
+
         when(commentEventMapper.toCommentCreatedEvent(comment)).thenThrow(mapperException);
 
         // When
@@ -316,10 +316,10 @@ class EventListenerServiceTest {
 
         // Then
         verify(commentEventMapper).toCommentCreatedEvent(replyComment);
-        
+
         ArgumentCaptor<CommentCreatedEvent> eventCaptor = ArgumentCaptor.forClass(CommentCreatedEvent.class);
         verify(eventPublisher).publishCommentCreatedEvent(eventCaptor.capture());
-        
+
         CommentCreatedEvent capturedEvent = eventCaptor.getValue();
         assertThat(capturedEvent.parentCommentId()).isEqualTo(150L);
         assertThat(capturedEvent.commentId()).isEqualTo(250L);
@@ -353,10 +353,10 @@ class EventListenerServiceTest {
 
         // Then
         verify(newsEventMapper).toNewsUpdatedEvent(newsWithoutUpdateDate);
-        
+
         ArgumentCaptor<NewsUpdatedEvent> eventCaptor = ArgumentCaptor.forClass(NewsUpdatedEvent.class);
         verify(eventPublisher).publishNewsUpdatedEvent(eventCaptor.capture());
-        
+
         NewsUpdatedEvent capturedEvent = eventCaptor.getValue();
         assertThat(capturedEvent.updateDate()).isNull();
         assertThat(capturedEvent.newsId()).isEqualTo(100L);
@@ -382,7 +382,7 @@ class EventListenerServiceTest {
         verify(newsEventMapper, times(1)).toNewsCreatedEvent(news);
         verify(newsEventMapper, times(1)).toNewsUpdatedEvent(news);
         verify(commentEventMapper, times(1)).toCommentCreatedEvent(comment);
-        
+
         verify(eventPublisher, times(1)).publishNewsCreatedEvent(any());
         verify(eventPublisher, times(1)).publishNewsUpdatedEvent(any());
         verify(eventPublisher, times(1)).publishCommentCreatedEvent(any());
